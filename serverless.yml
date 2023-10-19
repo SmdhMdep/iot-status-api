@@ -1,0 +1,81 @@
+service: streamingStatusApi
+frameworkVersion: "3"
+
+custom:
+  config: ${file(./config.${opt:stage, 'dev'}.json)}
+
+provider:
+  name: aws
+  deploymentMethod: direct
+  runtime: python3.11
+  region: eu-west-1
+  versionFunctions: false
+  architecture: "x86_64"
+  environment:
+    # shared variables related to cross cutting concerns
+    POWERTOOLS_SERVICE_NAME: ${self:service}
+    STAGE: ${opt:stage}
+    LOG_LEVEL: ${self:custom.config.logLevel}
+  logs:
+    httpApi: true
+  httpApi:
+    payload: "2.0"
+    disableDefaultEndpoint: false
+    cors:
+      allowCredentials: true
+      maxAge: 300
+      allowedOrigins:
+        - ${self:custom.config.corsAllowedOrigin}
+    authorizers:
+      # customJwtAuthorizer:
+      #   type: request
+      #   functionArn: arn:aws:lambda:eu-central-1:450869586150:function:jwt-authtoken-lambda
+      jwtAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: ${self:custom.config.oidc.jwtIssuerUrl}
+        audience:
+          - ${self:custom.config.oidc.clientId}
+  iam:
+    role:
+      statements:
+        # TODO convert to readonly on the required resources only for least-privileged permissions.
+        # currently need permissions to query the iot fleet indexing and dynamodb for the device lodger
+        - Effect: Allow
+          Action: iot:*
+          Resource: "*"
+        - Effect: Allow
+          Action: dynamodb:*
+          Resource: "*"
+
+package:
+  individually: true
+
+functions:
+  devicesStatusApi:
+    handler: streaming_status.app.handler
+    description: data streaming platform devices status API
+    package:
+      patterns:
+        - "!**"
+        - streaming_status/**
+    environment:
+      CORS_ALLOWED_ORIGIN: ${self:custom.config.corsAllowedOrigin}
+    layers:
+      # depends on the architecture
+      - arn:aws:lambda:${aws:region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:46
+    events:
+      - httpApi:
+          authorizer:
+            # TODO switch to using the custom authorizer, the default jwt authorizer doesn't validate the roles
+            # or maybe use a scope instead of a role.
+            name: jwtAuthorizer
+          path: /api/{proxy+}
+          method: "*"
+      - httpApi:
+          path: /api/{proxy+}
+          method: OPTIONS
+
+plugins:
+  - serverless-python-requirements
+  - serverless-offline
