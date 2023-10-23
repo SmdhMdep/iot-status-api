@@ -60,6 +60,10 @@ functions:
         - "!**"
         - streaming_status/**
     environment:
+      AWS_IOT_REGION: ${self:custom.config.awsIoTRegion}
+      OIDC_INTROSPECTION_ENDPOINT: ${self:custom.config.oidc.jwtIssuerUrl}/protocol/openid-connect/token/introspect
+      OIDC_CLIENT_ID: ${self:custom.config.oidc.clientId}
+      OIDC_CLIENT_SECRET: ${self:custom.config.oidc.clientSecret}
       CORS_ALLOWED_ORIGIN: ${self:custom.config.corsAllowedOrigin}
     layers:
       # depends on the architecture
