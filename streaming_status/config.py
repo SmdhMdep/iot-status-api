@@ -10,6 +10,22 @@ class _Config:
         return os.environ['AWS_IOT_REGION']
 
     @property
+    def s3_bucket_name(self) -> str:
+        return os.environ['S3_BUCKET_NAME']
+
+    @property
+    def s3_bucket_region(self) -> str:
+        return os.environ['S3_BUCKET_REGION']
+
+    @property
+    def mdep_url(self) -> str:
+        return os.environ['MDEP_URL']
+
+    @property
+    def mdep_api_key(self) -> str:
+        return os.environ['MDEP_API_KEY']
+
+    @property
     def oidc_client_id(self) -> str:
         return os.environ['OIDC_CLIENT_ID']
 

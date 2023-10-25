@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 
 from .errors import AppError
-from .data_sources import device_ledger, fleet_index
+from .data_sources import device_ledger, fleet_index, stream_data
 
 
 device_name_regex = re.compile(r'[a-zA-Z0-9:_-]+')
@@ -68,7 +68,21 @@ def get_device(provider, device_name):
 
     fleet_device = fleet_index.find_device(provider, device_name)
 
-    return _model_to_dto(fleet_model=fleet_device, ledger_model=ledger_device)
+    topic = _get_streaming_topic(ledger_device)
+    preview = stream_data.get_stream_preview(topic=topic)
+    dto = _model_to_dto(fleet_model=fleet_device, ledger_model=ledger_device, stream_preview=preview)
+    return dto
+
+def _get_streaming_topic(ledger_item) -> str:
+    statements = ledger_item['policyDoc']['Statement']
+    resource = next(
+        (stmt["Resource"] for stmt in statements if stmt["Action"] == "iot:Publish"),
+        None,
+    )
+    if not resource:
+        raise AppError(500, "inconsistent state when fetching stream preview")
+
+    return resource.split('topic/', maxsplit=1)[-1]
 
 def _search_result_to_dto(*, ledger_items, fleet_items, next_page):
     return {
@@ -79,36 +93,46 @@ def _search_result_to_dto(*, ledger_items, fleet_items, next_page):
         ]
     }
 
-def _model_to_dto(*, fleet_model=None, ledger_model=None):
-    if not fleet_model:
-        return {
-            "name": ledger_model["serialNumber"],
-            "connectivity": {
-                "connected": False,
-                "timestamp": None,
-                "disconnectReason": "NOT_PROVISIONED", # custom reason
-                "disconnectReasonDescription": "The client has not been provisioned yet."
-            },
-            "deviceInfo": _device_info_to_dto(ledger_model),
-        }
-    else:
-        model_connectivity = fleet_model['connectivity']
-        dto = {
-            "name": fleet_model['thingName'],
-            "connectivity": {
-                'connected': model_connectivity['connected'],
-                'timestamp': model_connectivity['timestamp'] / 1000.0,
-                'disconnectReason': (disconnect_reason := model_connectivity.get('disconnectReason')),
-                'disconnectReasonDescription': (
-                    fleet_index.get_disconnect_description(disconnect_reason)
-                    if disconnect_reason is not None else None
-                )
-            },
-        }
-        if ledger_model:
-            dto["deviceInfo"] = _device_info_to_dto(ledger_model)
+def _model_to_dto(
+    *,
+    fleet_model=None,
+    ledger_model=None,
+    stream_preview: str | None = None,
+):
+    assert(fleet_model is not None or ledger_model is not None)
+    return {
+        "name": fleet_model['thingName'] if fleet_model else ledger_model["serialNumber"],
+        "connectivity": _connectivity_to_dto(fleet_model),
+        **({ "deviceInfo": _device_info_to_dto(ledger_model) } if ledger_model else {}),
+        **({ "streamPreview": stream_preview } if stream_preview else {}),
+    }
 
-        return dto
+def _connectivity_to_dto(fleet_model=None):
+    connectivity = fleet_model['connectivity'] if fleet_model else None
+    return {
+        'connected': connectivity['connected'],
+        'timestamp': connectivity['timestamp'] / 1000.0,
+        'disconnectReason': (disconnect_reason := connectivity.get('disconnectReason')),
+        'disconnectReasonDescription': (
+            fleet_index.get_disconnect_description(disconnect_reason)
+            if disconnect_reason is not None else None
+        )
+    } if connectivity else {
+        "connected": False,
+        "timestamp": None,
+        "disconnectReason": "NOT_PROVISIONED", # custom reason
+        "disconnectReasonDescription": "The client has not been provisioned yet."
+    }
+
+def _device_info_to_dto(ledger_model):
+    return {
+        "organization": ledger_model["org"],
+        "project": ledger_model["proj"],
+        "provisioningStatus": ledger_model.get("provStatus"),
+        "provisioningTimestamp": _iso_to_timestamp_or_none(ledger_model.get("provTimestamp")),
+        "registrationStatus": ledger_model.get("regStatus"),
+        "registrationTimestamp": _iso_to_timestamp_or_none(ledger_model.get("regTimestamp")),
+    }
 
 def _iso_to_timestamp_or_none(iso_formatted: str | None):
     if iso_formatted is None:
@@ -117,13 +141,3 @@ def _iso_to_timestamp_or_none(iso_formatted: str | None):
     if iso_formatted.endswith('Z'):
         iso_formatted = f"{iso_formatted[:-1]}+00:00"
     return datetime.fromisoformat(iso_formatted).timestamp()
-
-def _device_info_to_dto(device_info):
-    return {
-        "organization": device_info["org"],
-        "project": device_info["proj"],
-        "provisioningStatus": device_info.get("provStatus"),
-        "provisioningTimestamp": _iso_to_timestamp_or_none(device_info.get("provTimestamp")),
-        "registrationStatus": device_info.get("regStatus"),
-        "registrationTimestamp": _iso_to_timestamp_or_none(device_info.get("regTimestamp")),
-    }

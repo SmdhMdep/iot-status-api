@@ -42,10 +42,7 @@ provider:
         # TODO convert to readonly on the required resources only for least-privileged permissions.
         # currently need permissions to query the iot fleet indexing and dynamodb for the device lodger
         - Effect: Allow
-          Action: iot:*
-          Resource: "*"
-        - Effect: Allow
-          Action: dynamodb:*
+          Action: [iot:*, dynamodb:*, s3:*]
           Resource: "*"
 
 package:
@@ -65,6 +62,10 @@ functions:
       OIDC_CLIENT_ID: ${self:custom.config.oidc.clientId}
       OIDC_CLIENT_SECRET: ${self:custom.config.oidc.clientSecret}
       CORS_ALLOWED_ORIGIN: ${self:custom.config.corsAllowedOrigin}
+      S3_BUCKET_NAME: ${self:custom.config.s3Bucket.name}
+      S3_BUCKET_REGION: ${self:custom.config.s3Bucket.region}
+      MDEP_URL: ${self:custom.config.mdep.url}
+      MDEP_API_KEY: ${self:custom.config.mdep.apiKey}
     layers:
       # depends on the architecture
       - arn:aws:lambda:${aws:region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:46
