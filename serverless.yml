@@ -2,7 +2,7 @@ service: streamingStatusApi
 frameworkVersion: "3"
 
 custom:
-  config: ${file(./config.${opt:stage, 'dev'}.json)}
+  dotenv: ${file(./dotenv_loader.js)}
 
 provider:
   name: aws
@@ -12,10 +12,9 @@ provider:
   versionFunctions: false
   architecture: "x86_64"
   environment:
-    # shared variables related to cross cutting concerns
     POWERTOOLS_SERVICE_NAME: ${self:service}
+    OIDC_INTROSPECTION_ENDPOINT: ${self:custom.dotenv.OIDC_JWT_ISSUER_URL}/protocol/openid-connect/token/introspect
     STAGE: ${opt:stage}
-    LOG_LEVEL: ${self:custom.config.logLevel}
   logs:
     httpApi: true
   httpApi:
@@ -25,7 +24,7 @@ provider:
       allowCredentials: true
       maxAge: 300
       allowedOrigins:
-        - ${self:custom.config.corsAllowedOrigin}
+        - ${self:custom.dotenv.CORS_ALLOWED_ORIGIN}
     authorizers:
       # customJwtAuthorizer:
       #   type: request
@@ -33,9 +32,9 @@ provider:
       jwtAuthorizer:
         type: jwt
         identitySource: $request.header.Authorization
-        issuerUrl: ${self:custom.config.oidc.jwtIssuerUrl}
+        issuerUrl: ${self:custom.dotenv.OIDC_JWT_ISSUER_URL}
         audience:
-          - ${self:custom.config.oidc.clientId}
+          - ${self:custom.dotenv.OIDC_CLIENT_ID}
   iam:
     role:
       statements:
@@ -56,16 +55,7 @@ functions:
       patterns:
         - "!**"
         - streaming_status/**
-    environment:
-      AWS_IOT_REGION: ${self:custom.config.awsIoTRegion}
-      OIDC_INTROSPECTION_ENDPOINT: ${self:custom.config.oidc.jwtIssuerUrl}/protocol/openid-connect/token/introspect
-      OIDC_CLIENT_ID: ${self:custom.config.oidc.clientId}
-      OIDC_CLIENT_SECRET: ${self:custom.config.oidc.clientSecret}
-      CORS_ALLOWED_ORIGIN: ${self:custom.config.corsAllowedOrigin}
-      S3_BUCKET_NAME: ${self:custom.config.s3Bucket.name}
-      S3_BUCKET_REGION: ${self:custom.config.s3Bucket.region}
-      MDEP_URL: ${self:custom.config.mdep.url}
-      MDEP_API_KEY: ${self:custom.config.mdep.apiKey}
+    environment: ${self:custom.dotenv}
     layers:
       # depends on the architecture
       - arn:aws:lambda:${aws:region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:46
