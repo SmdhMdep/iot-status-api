@@ -69,12 +69,15 @@ def get_device(provider, device_name):
     fleet_device = fleet_index.find_device(provider, device_name)
 
     topic = _get_streaming_topic(ledger_device)
-    preview = stream_data.get_stream_preview(topic=topic)
+    preview = stream_data.get_stream_preview(topic=topic) if topic else None
     dto = _model_to_dto(fleet_model=fleet_device, ledger_model=ledger_device, stream_preview=preview)
     return dto
 
-def _get_streaming_topic(ledger_item) -> str:
-    statements = ledger_item['policyDoc']['Statement']
+def _get_streaming_topic(ledger_item) -> str | None:
+    if ledger_item.get('provStatus') is None:
+        return None
+
+    statements = ledger_item.get('policyDoc', {}).get('Statement', [])
     resource = next(
         (stmt["Resource"] for stmt in statements if stmt["Action"] == "iot:Publish"),
         None,
@@ -111,17 +114,17 @@ def _connectivity_to_dto(fleet_model=None):
     connectivity = fleet_model['connectivity'] if fleet_model else None
     return {
         'connected': connectivity['connected'],
-        'timestamp': connectivity['timestamp'] / 1000.0,
+        'timestamp': timestamp / 1000.0 if (timestamp := connectivity['timestamp']) > 0 else None,
         'disconnectReason': (disconnect_reason := connectivity.get('disconnectReason')),
         'disconnectReasonDescription': (
             fleet_index.get_disconnect_description(disconnect_reason)
             if disconnect_reason is not None else None
-        )
+        ),
     } if connectivity else {
         "connected": False,
         "timestamp": None,
         "disconnectReason": "NOT_PROVISIONED", # custom reason
-        "disconnectReasonDescription": "The client has not been provisioned yet."
+        "disconnectReasonDescription": "The client has not been provisioned yet.",
     }
 
 def _device_info_to_dto(ledger_model):
