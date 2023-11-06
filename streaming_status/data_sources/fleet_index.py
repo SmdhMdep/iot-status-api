@@ -13,7 +13,7 @@ device_name_regex = re.compile(r'[a-zA-Z0-9:_-]+')
 REGISTRATION_WAY = 'RegistrationWay'
 SENSOR_PROVIDER = 'SensorProvider'
 
-iot_client = boto3.client("iot", region_name=config.iot_region_name)
+iot_client = boto3.client("iot", region_name=config.fleet_index_iot_region_name)
 
 
 def list_devices(provider: str, *, name_like: str | None = None, page: str | None = None, page_size: int):

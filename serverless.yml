@@ -3,6 +3,21 @@ frameworkVersion: "3"
 
 custom:
   dotenv: ${file(./dotenv_loader.js)}
+  jwtAuthorizer:
+    prod:
+      # custom authorizer in production is required to verify the role of the user
+      type: request
+      functionArn: !Sub arn:aws:lambda:${self:provider.region}:${AWS::AccountId}:function:${self:custom.dotenv.AUTH_FUNCTION_NAME, ''}
+      payloadVersion: "1.0"
+      resultTtlInSeconds: 0
+      identitySource:
+        - $request.header.Authorization
+    dev:
+      type: jwt
+      identitySource: $request.header.Authorization
+      issuerUrl: ${self:custom.dotenv.OIDC_JWT_ISSUER_URL}
+      audience:
+        - ${self:custom.dotenv.OIDC_CLIENT_ID}
 
 provider:
   name: aws
@@ -13,7 +28,6 @@ provider:
   architecture: "x86_64"
   environment:
     POWERTOOLS_SERVICE_NAME: ${self:service}
-    OIDC_INTROSPECTION_ENDPOINT: ${self:custom.dotenv.OIDC_JWT_ISSUER_URL}/protocol/openid-connect/token/introspect
     STAGE: ${opt:stage}
   logs:
     httpApi: true
@@ -26,23 +40,33 @@ provider:
       allowedOrigins:
         - ${self:custom.dotenv.CORS_ALLOWED_ORIGIN}
     authorizers:
-      # customJwtAuthorizer:
-      #   type: request
-      #   functionArn: arn:aws:lambda:eu-central-1:450869586150:function:jwt-authtoken-lambda
-      jwtAuthorizer:
-        type: jwt
-        identitySource: $request.header.Authorization
-        issuerUrl: ${self:custom.dotenv.OIDC_JWT_ISSUER_URL}
-        audience:
-          - ${self:custom.dotenv.OIDC_CLIENT_ID}
+      jwtAuthorizer: ${self:custom.jwtAuthorizer.${opt:stage}}
   iam:
     role:
       statements:
-        # TODO convert to readonly on the required resources only for least-privileged permissions.
-        # currently need permissions to query the iot fleet indexing and dynamodb for the device lodger
         - Effect: Allow
-          Action: [iot:*, dynamodb:*, s3:*]
-          Resource: "*"
+          Action:
+            - iot:SearchIndex
+          Resource:
+            - !Sub arn:aws:iot:${self:custom.dotenv.FLEET_INDEX_IOT_REGION_NAME}:${AWS::AccountId}:index/AWS_Things
+        - Effect: Allow
+          Action:
+            - dynamodb:BatchGetItem
+            - dynamodb:ConditionCheckItem
+            - dynamodb:Get*
+            - dynamodb:Scan
+            - dynamodb:Query
+            - dynamodb:List*
+            - dynamodb:Describe*
+          Resource:
+            - !Sub arn:aws:dynamodb:${self:custom.dotenv.DEVICE_LEDGER_TABLE_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.DEVICE_LEDGER_TABLE_NAME}
+        - Effect: Allow
+          Action:
+            - s3:Get*
+            - s3:List*
+          Resource:
+            - arn:aws:s3:::${self:custom.dotenv.STREAM_DATA_BUCKET_NAME}
+            - arn:aws:s3:::${self:custom.dotenv.STREAM_DATA_BUCKET_NAME}/*
 
 package:
   individually: true
@@ -62,8 +86,6 @@ functions:
     events:
       - httpApi:
           authorizer:
-            # TODO switch to using the custom authorizer, the default jwt authorizer doesn't validate the roles
-            # or maybe use a scope instead of a role.
             name: jwtAuthorizer
           path: /api/{proxy+}
           method: "*"

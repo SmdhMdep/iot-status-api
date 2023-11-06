@@ -8,7 +8,7 @@ from ..errors import AppError
 from ..utils import logger
 
 
-s3_client = boto3.client('s3', region_name=config.s3_bucket_region)
+s3_client = boto3.client('s3', region_name=config.stream_data_bucket_region)
 
 
 def get_stream_preview(topic: str) -> str | None:
@@ -57,7 +57,7 @@ def _find_package(id: str):
 
 def _download_into_file(key, file: BytesIO):
     s3_client.download_fileobj(
-        Bucket=config.s3_bucket_name,
+        Bucket=config.stream_data_bucket_name,
         Key=key,
         Fileobj=file,
     )

@@ -41,18 +41,6 @@ def pass_provider(route):
 
     return wrapper
 
-@app.get('/test')
-@pass_provider
-def test(provider):
-    import boto3
-    session = boto3.Session()
-    return {
-        'sessionRegion': session.region_name,
-        'event': app.current_event.raw_event,
-        'jwtClaims': app.current_event.request_context.authorizer.jwt_claim,
-        'provider': provider
-    }
-
 @app.get('/devices')
 @pass_provider
 def list_devices(provider: str):

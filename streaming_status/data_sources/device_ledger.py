@@ -7,7 +7,7 @@ from ..errors import AppError
 from ..config import config
 
 
-dynamodb = boto3.resource("dynamodb", region_name=config.iot_region_name)
+dynamodb = boto3.resource("dynamodb", region_name=config.device_ledger_table_region)
 
 
 def list_unprovisioned_devices(
@@ -36,7 +36,7 @@ def list_unprovisioned_devices(
             raise AppError.invalid_argument("invalid page key")
         pagination_kwargs['ExclusiveStartKey'] = page
 
-    result = dynamodb.Table("deviceInfo").scan(
+    result = dynamodb.Table(config.device_ledger_table_name).scan(
         Limit=page_size,
         ScanFilter=scan_filter, # type: ignore
         **pagination_kwargs, # type: ignore
@@ -51,8 +51,7 @@ def list_unprovisioned_devices(
 
 def find_device(provider, device_name):
     key = {"serialNumber": device_name}
-    dynamodb = boto3.resource("dynamodb", region_name=config.iot_region_name)
-    device_info = dynamodb.Table("deviceInfo").get_item(Key=key).get('Item')
-
+    device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get('Item')
     device_provider = device_info.get('jwtGroup')
+
     return device_info if not device_provider or device_provider == provider else None

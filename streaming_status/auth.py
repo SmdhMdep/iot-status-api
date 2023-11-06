@@ -22,7 +22,7 @@ class Auth:
         token = bearer_auth.removeprefix('Bearer ')
 
         response = requests.post(
-            config.oidc_introspection_endpoint,
+            f'{config.oidc_jwt_issuer_url}/protocol/openid-connect/token/introspect',
             auth=(config.oidc_client_id, config.oidc_client_secret),
             data=f'token={token}',
             headers={"Content-Type": "application/x-www-form-urlencoded"},
