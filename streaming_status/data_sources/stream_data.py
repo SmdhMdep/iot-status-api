@@ -10,6 +10,8 @@ from ..utils import logger
 
 s3_client = boto3.client('s3', region_name=config.stream_data_bucket_region)
 
+_PREVIEW_MAX_LINES = 5
+
 
 def get_stream_preview(topic: str) -> str | None:
     # topic name format: ($aws/?)rules/<rule_name>/<version>/<org>/<project>/<resource>
@@ -27,7 +29,9 @@ def get_stream_preview(topic: str) -> str | None:
     with BytesIO() as memory_file:
         _download_into_file(cloud_storage_path, memory_file)
         try:
-            return memory_file.readline().decode()
+            return '\n'.join(
+                line.decode() for _, line in zip(range(_PREVIEW_MAX_LINES), memory_file)
+            )
         except (ValueError, IOError) as e:
             logger.exception('unable to read file content for path: %s', cloud_storage_path)
             raise AppError(500, 'service not available')
