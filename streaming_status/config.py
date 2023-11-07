@@ -2,8 +2,8 @@ import os
 
 class _Config:
     @property
-    def enable_debug(self) -> bool:
-        return os.environ['STAGE'] == 'dev'
+    def is_offline(self) -> bool:
+        return os.environ['IS_OFFLINE'] == "true"
 
     @property
     def oidc_client_id(self) -> str:

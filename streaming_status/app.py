@@ -13,7 +13,7 @@ from .utils import logger
 
 
 cors = CORSConfig(allow_origin=config.cors_allowed_origin, max_age=300, allow_credentials=True)
-app = APIGatewayHttpResolver(strip_prefixes=['/api'], cors=cors, debug=config.enable_debug)
+app = APIGatewayHttpResolver(strip_prefixes=['/api'], cors=cors, debug=config.is_offline)
 
 
 @app.exception_handler(AppError)
@@ -27,11 +27,15 @@ def route_exception_handler(error: AppError):
 def pass_provider(route):
     @functools.wraps(route)
     def wrapper(*args, **kwargs):
+        requested_provider = app.current_event.get_query_string_value('provider')
+        if config.is_offline and requested_provider:
+            return route(*args, **kwargs, provider=requested_provider)
+
         groups = get_auth(app).group_memberships()
         if not groups:
             raise AppError.invalid_argument('missing groups')
 
-        provider = app.current_event.get_query_string_value('provider') or groups[0]
+        provider = requested_provider or groups[0]
         if provider not in groups:
             raise AppError.invalid_argument('provider not in groups: %s', provider)
 
