@@ -48,7 +48,13 @@ def _find_package(id: str):
         params={'id': id},
         headers={'Authorization': config.mdep_api_key}
     )
-    if response.status_code == requests.codes['not_found']:
+    if response.status_code in requests.codes['not_found']:
+        return None
+    if response.status_code == requests.codes['forbidden']:
+        # FIXME: forbidden status code should be treated as an error but for some reason even though
+        # the API token being used has admin privileges, the API refuses to allow access to some packages
+        # probably error from CKAN. For now we're just logging and ignoring it.
+        logger.error('got forbidden status code from MDEP API trying to request /api/3/action/package_show with id %s', id)
         return None
     response.raise_for_status()
 
