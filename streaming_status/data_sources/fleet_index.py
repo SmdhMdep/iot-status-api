@@ -16,9 +16,11 @@ SENSOR_PROVIDER = 'SensorProvider'
 iot_client = boto3.client("iot", region_name=config.fleet_index_iot_region_name)
 
 
-def list_devices(provider: str, *, name_like: str | None = None, page: str | None = None, page_size: int):
-    provider_quoted = provider.replace('"', '\\"')
-    query = f'attributes.{REGISTRATION_WAY}:* AND attributes.{SENSOR_PROVIDER}:"{provider_quoted}"'
+def list_devices(provider: str | None, *, name_like: str | None = None, page: str | None = None, page_size: int):
+    provider_quoted = provider.replace('"', '\\"') if provider else None
+    query = f'attributes.{REGISTRATION_WAY}:*'
+    if provider_quoted is not None:
+        query = f'{query} AND attributes.{SENSOR_PROVIDER}:"{provider_quoted}"'
     if name_like is not None:
         if not device_name_regex.fullmatch(name_like):
             raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
@@ -34,11 +36,14 @@ def list_devices(provider: str, *, name_like: str | None = None, page: str | Non
 
     return fleet_result.get('nextToken'), fleet_result.get("things") or []
 
-def find_device(provider, device_name):
+def find_device(provider: str | None, device_name: str):
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
 
-    query = f'attributes.SensorProvider:"{provider}" AND thingName:"{device_name}"'
+    query = f'thingName:"{device_name}"'
+    if provider is not None:
+        query = f'{query} AND attributes.SensorProvider:"{provider}"'
+
     result = iot_client.search_index(maxResults=1, queryString=query)
     if not result['things']:
         return None

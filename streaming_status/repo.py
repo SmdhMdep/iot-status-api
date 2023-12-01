@@ -29,8 +29,8 @@ def _load_page(page: str | None) -> tuple[LedgerPage, FleetPage]:
 def _dump_page(page_type, page: str) -> str:
     return f'l{page}' if page_type is LedgerPage else f'f{page}'
 
-def list_devices(provider: str, name_like: str | None = None, page: str | None = None):
-    provider = _canonicalize_provider_name(provider)
+def list_devices(provider: str | None, name_like: str | None = None, page: str | None = None):
+    provider = _canonicalize_provider_name(provider) if provider is not None else None
     ledger_page, fleet_page = _load_page(page)
     ledger_items, fleet_items, next_page = [], [], None # type: ignore
 
@@ -57,8 +57,8 @@ def list_devices(provider: str, name_like: str | None = None, page: str | None =
         next_page=next_page
     )
 
-def get_device(provider, device_name):
-    provider = _canonicalize_provider_name(provider)
+def get_device(provider: str | None, device_name: str):
+    provider = _canonicalize_provider_name(provider) if provider is not None else None
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
 

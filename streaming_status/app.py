@@ -28,7 +28,12 @@ def pass_provider(route):
     @functools.wraps(route)
     def wrapper(*args, **kwargs):
         requested_provider = app.current_event.get_query_string_value('provider')
-        if config.is_offline and requested_provider:
+        if config.is_offline:
+            is_admin = app.current_event.get_query_string_value('admin', 'false') == 'true'
+            return route(*args, **kwargs, provider=requested_provider if not is_admin else None)
+
+        is_admin = config.admin_role in get_auth(app).roles()
+        if is_admin:
             return route(*args, **kwargs, provider=requested_provider)
 
         groups = get_auth(app).group_memberships()

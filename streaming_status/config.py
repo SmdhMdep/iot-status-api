@@ -3,7 +3,7 @@ import os
 class _Config:
     @property
     def is_offline(self) -> bool:
-        return os.environ['IS_OFFLINE'] == "true"
+        return os.environ.get('IS_OFFLINE') == "true"
 
     @property
     def oidc_client_id(self) -> str:
@@ -16,6 +16,10 @@ class _Config:
     @property
     def oidc_jwt_issuer_url(self) -> str:
         return os.environ['OIDC_JWT_ISSUER_URL']
+
+    @property
+    def admin_role(self) -> str:
+        return 'iot-installer-admin-client-role'
 
     @property
     def cors_allowed_origin(self) -> str:

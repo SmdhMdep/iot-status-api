@@ -1,9 +1,9 @@
 import requests
-from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
-from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
+from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEventV2
 
 from .config import config
+from .utils import logger
 
 
 class Auth:
@@ -13,6 +13,14 @@ class Auth:
 
     def group_memberships(self) -> list[str]:
         return self.introspected_token().get('groups', [])
+
+    def roles(self) -> list[str]:
+        return (
+            self.introspected_token()
+                .get('resource_access', {})
+                .get('iot-installer-client', {})
+                .get('roles', [])
+        )
 
     def introspected_token(self) -> dict:
         if self._introspected_token is not None:

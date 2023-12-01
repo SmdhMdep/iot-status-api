@@ -11,14 +11,18 @@ dynamodb = boto3.resource("dynamodb", region_name=config.device_ledger_table_reg
 
 
 def list_unprovisioned_devices(
-    provider: str,
+    provider: str | None,
     *,
     name_like: str | None = None,
     page: str | None = None,
     page_size: int,
 ) -> tuple[str | None, list[dict]]:
     scan_filter = {
-        "jwtGroup": {"ComparisonOperator": "EQ", "AttributeValueList": [provider]},
+        **(
+            {"jwtGroup": {"ComparisonOperator": "EQ", "AttributeValueList": [provider]}}
+            if provider is not None
+            else {}
+        ),
         "provStatus": {"ComparisonOperator": "NULL"}
     }
 
@@ -49,9 +53,13 @@ def list_unprovisioned_devices(
     )
     return next_page_encoded, result["Items"]
 
-def find_device(provider, device_name):
+def find_device(provider: str | None, device_name: str):
     key = {"serialNumber": device_name}
     device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get('Item')
-    device_provider = device_info.get('jwtGroup')
+    device_provider = device_info.get('jwtGroup') # type: ignore
 
-    return device_info if not device_provider or device_provider == provider else None
+    return (
+        device_info
+        if not provider or not device_provider or device_provider == provider
+        else None
+    )
