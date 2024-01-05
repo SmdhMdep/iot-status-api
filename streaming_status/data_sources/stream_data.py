@@ -48,7 +48,7 @@ def _find_package(id: str):
         params={'id': id},
         headers={'Authorization': config.mdep_api_key}
     )
-    if response.status_code in requests.codes['not_found']:
+    if response.status_code == requests.codes['not_found']:
         return None
     if response.status_code == requests.codes['forbidden']:
         # FIXME: forbidden status code should be treated as an error but for some reason even though

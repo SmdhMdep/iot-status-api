@@ -1,49 +1,34 @@
-import requests
-from aws_lambda_powertools.event_handler import APIGatewayHttpResolver
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEventV2
 
 from .config import config
-from .utils import logger
+from .data_sources import keycloak_api
 
 
 class Auth:
     def __init__(self, event: APIGatewayProxyEventV2):
         self._event = event
+        auth_header = self._event.get_header_value('Authorization') or ''
+        self.token = auth_header.removeprefix('Bearer ')
         self._introspected_token: dict | None = None
+        self._groups: list[str] | None = None
 
     def group_memberships(self) -> list[str]:
-        return self.introspected_token().get('groups', [])
+        return self._introspect_token().get('groups', [])
 
     def roles(self) -> list[str]:
         return (
-            self.introspected_token()
+            self._introspect_token()
                 .get('resource_access', {})
                 .get('iot-installer-client', {})
                 .get('roles', [])
         )
 
-    def introspected_token(self) -> dict:
-        if self._introspected_token is not None:
-            return self._introspected_token
+    def is_admin(self) -> bool:
+        return config.admin_role in self.roles()
 
-        bearer_auth = self._event.get_header_value('Authorization') or ''
-        token = bearer_auth.removeprefix('Bearer ')
-
-        response = requests.post(
-            f'{config.oidc_jwt_issuer_url}/protocol/openid-connect/token/introspect',
-            auth=(config.oidc_client_id, config.oidc_client_secret),
-            data=f'token={token}',
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+    def _introspect_token(self) -> dict:
+        self._introspected_token = (
+            self._introspected_token
+            or keycloak_api.introspect_oidc_token(self.token)
         )
-        response.raise_for_status()
-
-        self._introspected_token = response.json()
         return self._introspected_token
-
-
-def get_auth(app: APIGatewayHttpResolver) -> Auth:
-    auth = app.context.get('auth')
-    if auth is None:
-        auth = Auth(app.current_event)
-        app.append_context(auth=auth)
-    return auth

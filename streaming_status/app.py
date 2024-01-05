@@ -6,7 +6,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConf
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 from . import repo
-from .auth import get_auth
+from .auth import Auth
 from .config import config
 from .errors import AppError
 from .utils import logger
@@ -24,7 +24,19 @@ def route_exception_handler(error: AppError):
         body=json.dumps({'message': error.args[0]}),
     )
 
+def get_auth(app: APIGatewayHttpResolver) -> Auth:
+    """Returns the `Auth` object for the current event context."""
+    auth = app.context.get('auth')
+    if auth is None:
+        auth = Auth(app.current_event)
+        app.append_context(auth=auth)
+    return auth
+
 def pass_provider(route):
+    """Decorator for passing the selected provider based on the current event to a route.
+
+    The decorated route must accept a keyword argument named `provider`.
+    """
     @functools.wraps(route)
     def wrapper(*args, **kwargs):
         requested_provider = app.current_event.get_query_string_value('provider')
@@ -32,8 +44,7 @@ def pass_provider(route):
             is_admin = app.current_event.get_query_string_value('admin', 'false') == 'true'
             return route(*args, **kwargs, provider=requested_provider if not is_admin else None)
 
-        is_admin = config.admin_role in get_auth(app).roles()
-        if is_admin:
+        if get_auth(app).is_admin():
             return route(*args, **kwargs, provider=requested_provider)
 
         groups = get_auth(app).group_memberships()
@@ -63,6 +74,20 @@ def list_devices(provider: str):
 @pass_provider
 def get_device(device_name: str, provider: str):
     return repo.get_device(provider=provider, device_name=device_name)
+
+@app.get('/providers')
+def list_providers():
+    query, page_arg = (
+        app.current_event.get_query_string_value("query"),
+        app.current_event.get_query_string_value("page", "0"),
+    )
+
+    try:
+        page = int(page_arg) if page_arg else None
+    except ValueError:
+        raise AppError.invalid_argument("page must be a number")
+    else:
+        return repo.list_providers(get_auth(app), name_like=query, page=page)
 
 @logger.inject_lambda_context(correlation_id_path=API_GATEWAY_HTTP)
 def handler(event: dict, context: LambdaContext) -> dict:

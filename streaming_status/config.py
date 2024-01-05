@@ -18,6 +18,10 @@ class _Config:
         return os.environ['OIDC_JWT_ISSUER_URL']
 
     @property
+    def keycloak_admin_api_url(self) -> str:
+        return os.environ['KEYCLOAK_ADMIN_API_BASE_URL']
+
+    @property
     def admin_role(self) -> str:
         return 'iot-installer-admin-client-role'
 
