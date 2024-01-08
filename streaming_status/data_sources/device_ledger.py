@@ -17,46 +17,78 @@ def list_unprovisioned_devices(
     page: str | None = None,
     page_size: int,
 ) -> tuple[str | None, list[dict]]:
-    scan_filter = {
-        **(
-            {"jwtGroup": {"ComparisonOperator": "EQ", "AttributeValueList": [provider]}}
-            if provider is not None
-            else {}
-        ),
-        "provStatus": {"ComparisonOperator": "NULL"}
-    }
+    try:
+        decoded_page = (
+            json.loads(base64.decodebytes(page.encode()).decode())
+            if page else None
+        )
+    except:
+        raise AppError.invalid_argument("invalid page key")
 
+    next_page, items = _scan_table(
+        provider=provider,
+        name_like=name_like,
+        page=decoded_page,
+        page_size=page_size,
+    )
+
+    next_page_encoded = (
+        base64.encodebytes(json.dumps(next_page).encode()).decode()
+        if next_page else None
+    )
+    return next_page_encoded, items
+
+def _build_scan_params(
+    provider: str | None,
+    *,
+    name_like: str | None = None,
+    page: dict | None = None,
+    page_size: int,
+):
+    scan_filter: dict = {"provStatus": {"ComparisonOperator": "NULL"}}
+    if provider is not None:
+        scan_filter["jwtGroup"] = {
+            "ComparisonOperator": "EQ",
+            "AttributeValueList": [provider],
+        }
     if name_like:
         scan_filter["serialNumber"] = {
             "ComparisonOperator": "BEGINS_WITH",
             "AttributeValueList": [name_like]
         }
 
-    pagination_kwargs = {}
-    if page:
-        try:
-            page = json.loads(base64.decodebytes(page.encode()).decode())
-        except:
-            raise AppError.invalid_argument("invalid page key")
-        pagination_kwargs['ExclusiveStartKey'] = page
+    params: dict = {"ExclusiveStartKey": page} if page else {}
+    params["Limit"] = page_size
+    params["ScanFilter"] = scan_filter
 
-    result = dynamodb.Table(config.device_ledger_table_name).scan(
-        Limit=page_size,
-        ScanFilter=scan_filter, # type: ignore
-        **pagination_kwargs, # type: ignore
-    )
+    return params
 
-    next_page = result.get('LastEvaluatedKey') if result["Count"] == page_size else None
-    next_page_encoded = (
-        base64.encodebytes(json.dumps(next_page).encode()).decode()
-        if next_page else None
-    )
-    return next_page_encoded, result["Items"]
+def _scan_table(
+    provider: str | None,
+    *,
+    name_like: str | None = None,
+    page: dict | None = None,
+    page_size: int,
+):
+    scan_page, items = page, []
+    while True:
+        params = _build_scan_params(provider, name_like=name_like, page=scan_page, page_size=page_size)
+        result = dynamodb.Table(config.device_ledger_table_name).scan(**params)
+        items.extend(result["Items"])
+
+        next_page = result.get("LastEvaluatedKey")
+        if len(items) < page_size and next_page is not None:
+            scan_page = next_page # type: ignore
+        else:
+            break
+
+    return next_page, items
+
 
 def find_device(provider: str | None, device_name: str):
     key = {"serialNumber": device_name}
-    device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get('Item')
-    device_provider = device_info.get('jwtGroup') # type: ignore
+    device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get("Item")
+    device_provider = device_info.get("jwtGroup") # type: ignore
 
     return (
         device_info

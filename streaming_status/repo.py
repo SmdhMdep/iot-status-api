@@ -121,7 +121,7 @@ def _model_to_dto(
 
     provider = (
         ledger_model["jwtGroup"] if ledger_model and "jwtGroup" in ledger_model
-        else fleet_model.get("attributes", {}).get(fleet_index.SENSOR_PROVIDER)
+        else (fleet_model or {}).get("attributes", {}).get(fleet_index.SENSOR_PROVIDER)
     )
     provider = ' '.join(map(str.capitalize, provider.split("-"))) if provider else None
 
