@@ -1,3 +1,4 @@
+import re
 from io import BytesIO
 
 import boto3
@@ -12,12 +13,19 @@ s3_client = boto3.client('s3', region_name=config.stream_data_bucket_region)
 
 _PREVIEW_MAX_LINES = 5
 
+_camel_to_kebab_case_pattern = re.compile(r'(?<!^)(?=[A-Z])')
+
+
+def canonicalize_project_name(name: str) -> str:
+    return _camel_to_kebab_case_pattern.sub('-', name).lower()
+
 
 def get_stream_preview(topic: str) -> str | None:
     # topic name format: ($aws/?)rules/<rule_name>/<version>/<org>/<project>/<resource>
     _, _, org_name, project_name, resource_name = (
         topic.removeprefix('$aws/').removeprefix('rules/').split('/')
     )
+    project_name = canonicalize_project_name(project_name)
     package_name = '--'.join((org_name, project_name))
 
     if not (package := _find_package(id=package_name)):
