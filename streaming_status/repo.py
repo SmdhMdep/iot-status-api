@@ -3,6 +3,7 @@ from datetime import datetime
 
 from .auth import Auth
 from .errors import AppError
+from .utils import logger
 from .data_sources import device_ledger, fleet_index, stream_data, keycloak_api
 
 
@@ -53,8 +54,15 @@ def get_device(provider: str | None, device_name: str):
 
     fleet_device = fleet_index.find_device(provider, device_name)
 
-    topic = _get_streaming_topic(ledger_device)
-    preview = stream_data.get_stream_preview(topic=topic) if topic else None
+    try:
+        topic = _get_streaming_topic(ledger_device)
+        preview = stream_data.get_stream_preview(topic=topic) if topic else None
+    except AppError as e:
+        if e.status_code != AppError.INTERNAL_ERROR_CODE:
+            raise
+        logger.exception("(suppressed) error fetching stream preview")
+        preview = "<error fetching preview>"
+
     dto = _model_to_dto(fleet_model=fleet_device, ledger_model=ledger_device, stream_preview=preview)
     return dto
 
@@ -98,7 +106,7 @@ def _get_streaming_topic(ledger_item) -> str | None:
         None,
     )
     if not resource:
-        raise AppError(500, "inconsistent state when fetching stream preview")
+        raise AppError.internal_error("inconsistent state when fetching stream preview")
 
     return resource.split('topic/', maxsplit=1)[-1]
 

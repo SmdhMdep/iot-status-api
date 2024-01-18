@@ -3,6 +3,7 @@ from io import BytesIO
 
 import boto3
 import requests
+from botocore.exceptions import ClientError
 
 from ..config import config
 from ..errors import AppError
@@ -35,14 +36,14 @@ def get_stream_preview(topic: str) -> str | None:
         return None
 
     with BytesIO() as memory_file:
-        _download_into_file(cloud_storage_path, memory_file)
         try:
+            _download_into_file(cloud_storage_path, memory_file)
             return '\n'.join(
                 line.decode() for _, line in zip(range(_PREVIEW_MAX_LINES), memory_file)
             )
-        except (ValueError, IOError) as e:
+        except (ValueError, IOError, ClientError):
             logger.exception('unable to read file content for path: %s', cloud_storage_path)
-            raise AppError(500, 'service not available')
+            raise AppError.internal_error('service not available')
 
 def _find_storage_path(package: dict, name: str) -> str | None:
     for resource in package['resources']:
@@ -69,7 +70,7 @@ def _find_package(id: str):
     body = response.json()
     if not body['success']:
         logger.error("unable to fetch package %s from mdep api", id)
-        raise AppError(500, 'service not available')
+        raise AppError.internal_error('service not available')
 
     return body['result']
 
