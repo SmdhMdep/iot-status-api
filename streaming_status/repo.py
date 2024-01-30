@@ -15,24 +15,29 @@ LedgerPage = str | None
 FleetPage = str | None
 
 
-def list_devices(provider: str | None, name_like: str | None = None, page: str | None = None):
-    provider = _canonicalize_provider_name(provider) if provider is not None else None
+def list_devices(
+    provider: str | None,
+    name_like: str | None = None,
+    page: str | None = None,
+    page_size: int | None = PAGE_SIZE
+):
+    provider = _canonicalize_provider_name(provider)
     ledger_page, fleet_page = _load_page(page)
     ledger_items, fleet_items, next_page = [], [], None # type: ignore
 
     is_first_page = not ledger_page and not fleet_page
     if ledger_page or is_first_page:
-        next_page, ledger_items = device_ledger.list_unprovisioned_devices(
-            provider, name_like=name_like, page=ledger_page, page_size=PAGE_SIZE
+        next_page, ledger_items = device_ledger.list_devices(
+            provider, name_like=name_like, page=ledger_page, page_size=page_size, unprovisioned_only=True
         )
         if next_page:
             next_page = _dump_page(LedgerPage, next_page)
 
-    is_partial_page = not next_page and len(ledger_items) < PAGE_SIZE
+    is_partial_page = not next_page and (page_size is None or len(ledger_items) < page_size)
     if fleet_page or is_partial_page:
-        page_size = PAGE_SIZE - len(ledger_items)
+        cont_page_size = page_size - len(ledger_items) if page_size is not None else None
         next_page, fleet_items = fleet_index.list_devices(
-            provider, name_like=name_like, page=fleet_page, page_size=page_size
+            provider, name_like=name_like, page=fleet_page, page_size=cont_page_size
         )
         if next_page:
             next_page = _dump_page(FleetPage, next_page)
@@ -43,8 +48,14 @@ def list_devices(provider: str | None, name_like: str | None = None, page: str |
         next_page=next_page
     )
 
+def export_devices(provider: str | None) -> list[dict]:
+    provider = _canonicalize_provider_name(provider)
+    _, fleet_items = fleet_index.list_devices(provider=provider)
+    _, ledger_items = device_ledger.list_devices(provider=provider)
+    return _merge_models_to_dtos(fleet_items, ledger_items)
+
 def get_device(provider: str | None, device_name: str):
-    provider = _canonicalize_provider_name(provider) if provider is not None else None
+    provider = _canonicalize_provider_name(provider)
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
 
@@ -80,8 +91,8 @@ def list_providers(auth: Auth, name_like: str | None = None, page: int | None = 
         ]
         return {'providers': providers}
 
-def _canonicalize_provider_name(provider: str) -> str:
-    return '-'.join(provider.lower().split(' '))
+def _canonicalize_provider_name(provider: str | None) -> str | None:
+    return '-'.join(provider.lower().split(' ')) if provider is not None else None
 
 def _load_page(page: str | None) -> tuple[LedgerPage, FleetPage]:
     if not page:
@@ -175,3 +186,13 @@ def _iso_to_timestamp_or_none(iso_formatted: str | None):
     if iso_formatted.endswith('Z'):
         iso_formatted = f"{iso_formatted[:-1]}+00:00"
     return datetime.fromisoformat(iso_formatted).timestamp()
+
+def _merge_models_to_dtos(fleet_items, ledger_items):
+    lookup = {fleet_model['thingName']: fleet_model for fleet_model in fleet_items}
+    return [
+        _model_to_dto(
+            fleet_model=lookup.get(ledger_model['serialNumber']),
+            ledger_model=ledger_model,
+        )
+        for ledger_model in ledger_items
+    ]

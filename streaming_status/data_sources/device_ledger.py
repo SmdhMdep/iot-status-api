@@ -10,12 +10,13 @@ from ..config import config
 dynamodb = boto3.resource("dynamodb", region_name=config.device_ledger_table_region)
 
 
-def list_unprovisioned_devices(
+def list_devices(
     provider: str | None,
     *,
     name_like: str | None = None,
     page: str | None = None,
-    page_size: int,
+    page_size: int | None = None,
+    unprovisioned_only: bool = False,
 ) -> tuple[str | None, list[dict]]:
     try:
         decoded_page = (
@@ -30,6 +31,7 @@ def list_unprovisioned_devices(
         name_like=name_like,
         page=decoded_page,
         page_size=page_size,
+        unprovisioned_only=unprovisioned_only,
     )
 
     next_page_encoded = (
@@ -41,11 +43,12 @@ def list_unprovisioned_devices(
 def _build_scan_params(
     provider: str | None,
     *,
-    name_like: str | None = None,
-    page: dict | None = None,
-    page_size: int,
+    name_like: str | None,
+    page: dict | None,
+    page_size: int | None,
+    unprovisioned_only: bool,
 ):
-    scan_filter: dict = {"provStatus": {"ComparisonOperator": "NULL"}}
+    scan_filter: dict = {}
     if provider is not None:
         scan_filter["jwtGroup"] = {
             "ComparisonOperator": "EQ",
@@ -56,28 +59,38 @@ def _build_scan_params(
             "ComparisonOperator": "BEGINS_WITH",
             "AttributeValueList": [name_like]
         }
+    if unprovisioned_only:
+        scan_filter["provStatus"] = {"ComparisonOperator": "NULL"}
 
-    params: dict = {"ExclusiveStartKey": page} if page else {}
-    params["Limit"] = page_size
-    params["ScanFilter"] = scan_filter
-
+    params: dict = {
+        "ScanFilter": scan_filter,
+        **({"ExclusiveStartKey": page} if page else {}),
+        **({"Limit": page_size} if page_size else {}),
+    }
     return params
 
 def _scan_table(
     provider: str | None,
     *,
-    name_like: str | None = None,
-    page: dict | None = None,
-    page_size: int,
+    name_like: str | None,
+    page: dict | None,
+    page_size: int | None,
+    unprovisioned_only: bool,
 ):
     scan_page, items = page, []
     while True:
-        params = _build_scan_params(provider, name_like=name_like, page=scan_page, page_size=page_size)
+        params = _build_scan_params(
+            provider,
+            name_like=name_like,
+            page=scan_page,
+            page_size=page_size,
+            unprovisioned_only=unprovisioned_only,
+        )
         result = dynamodb.Table(config.device_ledger_table_name).scan(**params)
         items.extend(result["Items"])
 
         next_page = result.get("LastEvaluatedKey")
-        if len(items) < page_size and next_page is not None:
+        if (page_size is None or len(items) < page_size) and next_page is not None:
             scan_page = next_page # type: ignore
         else:
             break

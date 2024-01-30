@@ -3,6 +3,7 @@
 This API exposes three endpoints:
 
 - /api/devices - list all devices for the provider
+- /api/devices/export - export a list of all devices into csv or json
 - /api/devices/<device_id> - get device details
 - /api/providers - for admins, list all device providers
 

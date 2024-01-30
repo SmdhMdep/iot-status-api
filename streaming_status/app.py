@@ -70,6 +70,32 @@ def list_devices(provider: str):
     )
     return repo.list_devices(provider=provider, name_like=query, page=page)
 
+@app.get('/devices/export')
+@pass_provider
+def export_devices(provider: str):
+    requested_format, compress = (
+        app.current_event.get_query_string_value("format", "csv"),
+        app.current_event.get_query_string_value("compress", "1") == "1",
+    )
+
+    if requested_format == "csv":
+        from .csv_serializer import serialize_devices as serialize
+    elif requested_format == "json":
+        from json import dumps as serialize # type: ignore
+    else:
+        raise AppError.invalid_argument(f"expected format to be 'csv' or 'json' got '{requested_format}'")
+
+    filename = f"devices_export.{requested_format}"
+    body = serialize(repo.export_devices(provider=provider))
+
+    return Response(
+        status_code=200,
+        content_type='text/csv' if requested_format == 'csv' else 'application/json',
+        headers={'Content-Disposition': f'attachment;filename={filename}'},
+        body=body,
+        compress=compress,
+    )
+
 @app.get('/devices/<device_name>')
 @pass_provider
 def get_device(device_name: str, provider: str):

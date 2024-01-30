@@ -16,7 +16,13 @@ SENSOR_PROVIDER = 'SensorProvider'
 iot_client = boto3.client("iot", region_name=config.fleet_index_iot_region_name)
 
 
-def list_devices(provider: str | None, *, name_like: str | None = None, page: str | None = None, page_size: int):
+def list_devices(
+    provider: str | None,
+    *,
+    name_like: str | None = None,
+    page: str | None = None,
+    page_size: int | None = None
+):
     provider_quoted = provider.replace('"', '\\"') if provider else None
     query = f'attributes.{REGISTRATION_WAY}:*'
     if provider_quoted is not None:
@@ -27,12 +33,15 @@ def list_devices(provider: str | None, *, name_like: str | None = None, page: st
         name_like_attr = name_like.replace(":", "\:")
         query = f'{query} AND thingName:{name_like_attr}*'
 
-    request_params = {}
+    request_params: dict = {}
     if page is not None:
         request_params['nextToken'] = page
+    if page_size is not None:
+        request_params['maxResults'] = page_size
+
     # sample: samples/search_index_query_sample.json
     logger.info("search index query: %s", query)
-    fleet_result = iot_client.search_index(maxResults=page_size, queryString=query, **request_params)
+    fleet_result = iot_client.search_index(queryString=query, **request_params)
 
     return fleet_result.get('nextToken'), fleet_result.get("things") or []
 
