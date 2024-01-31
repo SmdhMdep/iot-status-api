@@ -2,6 +2,8 @@ from csv import DictWriter
 from io import TextIOBase, StringIO
 from typing import Any
 
+from .model import Device
+
 
 DEVICE_DTO_KEYS = [
     "name",
@@ -19,7 +21,7 @@ DEVICE_DTO_KEYS = [
 ]
 
 
-def serialize_devices(data: list[dict]) -> str:
+def serialize_devices(data: list[Device]) -> str:
     """Serialize list of device DTO into a CSV format"""
     with StringIO() as file:
         _write_csv(file, DEVICE_DTO_KEYS, data)
@@ -27,7 +29,7 @@ def serialize_devices(data: list[dict]) -> str:
         return file.read()
 
 
-def _write_csv(file: TextIOBase, keys: list[str], data: list[dict]):
+def _write_csv(file: TextIOBase, keys: list[str], data: list[Device]):
     writer = DictWriter(file, keys)
     writer.writeheader()
     for datum in data:
@@ -36,7 +38,7 @@ def _write_csv(file: TextIOBase, keys: list[str], data: list[dict]):
         })
 
 
-def _read_value(data: dict, key: str):
+def _read_value(data: Device, key: str):
     segments = key.split('.')
     value: Any = data
 

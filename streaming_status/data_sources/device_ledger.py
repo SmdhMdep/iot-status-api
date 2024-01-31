@@ -26,13 +26,8 @@ def list_devices(
     except:
         raise AppError.invalid_argument("invalid page key")
 
-    next_page, items = _scan_table(
-        provider=provider,
-        name_like=name_like,
-        page=decoded_page,
-        page_size=page_size,
-        unprovisioned_only=unprovisioned_only,
-    )
+    scan_params = _build_scan_params(provider, name_like=name_like, unprovisioned_only=unprovisioned_only)
+    next_page, items = _scan_table(scan_params, page=decoded_page, page_size=page_size)
 
     next_page_encoded = (
         base64.encodebytes(json.dumps(next_page).encode()).decode()
@@ -44,10 +39,8 @@ def _build_scan_params(
     provider: str | None,
     *,
     name_like: str | None,
-    page: dict | None,
-    page_size: int | None,
     unprovisioned_only: bool,
-):
+) -> dict:
     scan_filter: dict = {}
     if provider is not None:
         scan_filter["jwtGroup"] = {
@@ -62,30 +55,21 @@ def _build_scan_params(
     if unprovisioned_only:
         scan_filter["provStatus"] = {"ComparisonOperator": "NULL"}
 
-    params: dict = {
-        "ScanFilter": scan_filter,
-        **({"ExclusiveStartKey": page} if page else {}),
-        **({"Limit": page_size} if page_size else {}),
-    }
-    return params
+    return {"ScanFilter": scan_filter}
 
 def _scan_table(
-    provider: str | None,
+    parameters: dict,
     *,
-    name_like: str | None,
     page: dict | None,
     page_size: int | None,
-    unprovisioned_only: bool,
 ):
     scan_page, items = page, []
     while True:
-        params = _build_scan_params(
-            provider,
-            name_like=name_like,
-            page=scan_page,
-            page_size=page_size,
-            unprovisioned_only=unprovisioned_only,
-        )
+        params = {
+            **parameters,
+            **({"ExclusiveStartKey": scan_page} if scan_page else {}),
+            **({"Limit": page_size} if page_size else {}),
+        }
         result = dynamodb.Table(config.device_ledger_table_name).scan(**params)
         items.extend(result["Items"])
 

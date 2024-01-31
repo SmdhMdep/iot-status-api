@@ -59,11 +59,8 @@ def find_device(provider: str | None, device_name: str):
 
     return result['things'][0]
 
-def get_disconnect_description(reason: str) -> str:
-    return _DISCONNECT_REASONS[reason]
 
-
-_DISCONNECT_REASONS = {
+DISCONNECT_REASON_DESCRIPTIONS = {
     'AUTH_ERROR': 'The client failed to authenticate or authorization failed.',
     'CLIENT_ERROR': 'The client did something wrong that causes it to disconnect. '
                     'For example, a client will be disconnected for sending more '
@@ -93,5 +90,5 @@ _DISCONNECT_REASONS = {
     'THROTTLED': 'The client is disconnected for exceeding a throttling limit.',
     'WEBSOCKET_TTL_EXPIRATION': 'The client is disconnected because a WebSocket '
                                 'has been connected longer than its time-to-live '
-    'value.'
+                                'value.'
 }

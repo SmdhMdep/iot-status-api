@@ -33,7 +33,7 @@ def get_auth(app: APIGatewayHttpResolver) -> Auth:
     return auth
 
 def pass_provider(route):
-    """Decorator for passing the selected provider based on the current event to a route.
+    """Decorator for passing the selected provider to a route based on the current event.
 
     The decorated route must accept a keyword argument named `provider`.
     """

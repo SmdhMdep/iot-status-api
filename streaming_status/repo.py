@@ -1,26 +1,35 @@
 import re
-from datetime import datetime
+from typing import TypedDict, TypeVar, Generic, NotRequired
 
 from .auth import Auth
 from .errors import AppError
+from .model import entity_to_model, Device
 from .utils import logger
 from .data_sources import device_ledger, fleet_index, stream_data, keycloak_api
 
 
 device_name_regex = re.compile(r'[a-zA-Z0-9:_-]+')
 
-PAGE_SIZE = 20
+DEFAULT_PAGE_SIZE = 20
 
 LedgerPage = str | None
 FleetPage = str | None
+
+_T = TypeVar('_T')
+_P = TypeVar('_P')
+
+
+class PaginatedResult(Generic[_P, _T], TypedDict):
+    nextPage: NotRequired[_P | None]
+    items: list[_T]
 
 
 def list_devices(
     provider: str | None,
     name_like: str | None = None,
     page: str | None = None,
-    page_size: int | None = PAGE_SIZE
-):
+    page_size: int | None = DEFAULT_PAGE_SIZE,
+) -> PaginatedResult[str, Device]:
     provider = _canonicalize_provider_name(provider)
     ledger_page, fleet_page = _load_page(page)
     ledger_items, fleet_items, next_page = [], [], None # type: ignore
@@ -42,19 +51,19 @@ def list_devices(
         if next_page:
             next_page = _dump_page(FleetPage, next_page)
 
-    return _search_result_to_dto(
+    return _search_result_to_model(
         ledger_items=ledger_items,
         fleet_items=fleet_items,
-        next_page=next_page
+        next_page=next_page,
     )
 
-def export_devices(provider: str | None) -> list[dict]:
+def export_devices(provider: str | None) -> list[Device]:
     provider = _canonicalize_provider_name(provider)
     _, fleet_items = fleet_index.list_devices(provider=provider)
     _, ledger_items = device_ledger.list_devices(provider=provider)
-    return _merge_models_to_dtos(fleet_items, ledger_items)
+    return _merge_entities_to_models(fleet_items, ledger_items)
 
-def get_device(provider: str | None, device_name: str):
+def get_device(provider: str | None, device_name: str) -> Device:
     provider = _canonicalize_provider_name(provider)
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
@@ -74,22 +83,26 @@ def get_device(provider: str | None, device_name: str):
         logger.exception("(suppressed) error fetching stream preview")
         preview = "<error fetching preview>"
 
-    dto = _model_to_dto(fleet_model=fleet_device, ledger_model=ledger_device, stream_preview=preview)
-    return dto
+    return entity_to_model(fleet_entity=fleet_device, ledger_entity=ledger_device, stream_preview=preview)
 
-def list_providers(auth: Auth, name_like: str | None = None, page: int | None = None):
+def list_providers(
+    auth: Auth,
+    name_like: str | None = None,
+    page: int | None = None,
+    page_size: int = DEFAULT_PAGE_SIZE,
+) -> PaginatedResult[int, str]:
     if auth.is_admin():
         next_page, providers = keycloak_api.groups(
-            auth.token, name_like=name_like, page=page or 0, page_size=PAGE_SIZE
+            auth.token, name_like=name_like, page=page or 0, page_size=page_size
         )
-        return {'providers': providers, 'nextPage': next_page}
+        return {'items': providers, 'nextPage': next_page}
     else:
         name_like = name_like or ''
         providers = [
             group for group in auth.group_memberships()
             if name_like in group
         ]
-        return {'providers': providers}
+        return {'items': providers}
 
 def _canonicalize_provider_name(provider: str | None) -> str | None:
     return '-'.join(provider.lower().split(' ')) if provider is not None else None
@@ -121,78 +134,34 @@ def _get_streaming_topic(ledger_item) -> str | None:
 
     return resource.split('topic/', maxsplit=1)[-1]
 
-def _search_result_to_dto(*, ledger_items, fleet_items, next_page):
+def _search_result_to_model(
+    *,
+    ledger_items: list[dict],
+    fleet_items: list[dict],
+    next_page: str | None,
+) -> PaginatedResult[str, Device]:
+    """Create a search result based on items from both data sources.
+
+    `ledger_items` and `fleet_items` must form a disjoint set.
+    """
     return {
         'nextPage': next_page,
-        'devices': [
-            *(_model_to_dto(ledger_model=device) for device in ledger_items),
-            *(_model_to_dto(fleet_model=device) for device in fleet_items),
+        'items': [
+            *(entity_to_model(ledger_entity=entity) for entity in ledger_items),
+            *(entity_to_model(fleet_entity=entity) for entity in fleet_items),
         ]
     }
 
-def _model_to_dto(
-    *,
-    fleet_model=None,
-    ledger_model=None,
-    stream_preview: str | None = None,
-):
-    assert(fleet_model is not None or ledger_model is not None)
+def _merge_entities_to_models(fleet_items, ledger_items) -> list[Device]:
+    """Merges device entities from fleet index and device ledger into a list of models.
 
-    provider = (
-        ledger_model["jwtGroup"] if ledger_model and "jwtGroup" in ledger_model
-        else (fleet_model or {}).get("attributes", {}).get(fleet_index.SENSOR_PROVIDER)
-    )
-    provider = ' '.join(map(str.capitalize, provider.split("-"))) if provider else None
-
-    return {
-        "name": fleet_model['thingName'] if fleet_model else ledger_model["serialNumber"],
-        "connectivity": _connectivity_to_dto(fleet_model),
-        "provider": provider,
-        **({ "deviceInfo": _device_info_to_dto(ledger_model) } if ledger_model else {}),
-        **({ "streamPreview": stream_preview } if stream_preview else {}),
-    }
-
-def _connectivity_to_dto(fleet_model=None):
-    connectivity = fleet_model['connectivity'] if fleet_model else None
-    return {
-        'connected': connectivity['connected'],
-        'timestamp': timestamp / 1000.0 if (timestamp := connectivity['timestamp']) > 0 else None,
-        'disconnectReason': (disconnect_reason := connectivity.get('disconnectReason')),
-        'disconnectReasonDescription': (
-            fleet_index.get_disconnect_description(disconnect_reason)
-            if disconnect_reason is not None else None
-        ),
-    } if connectivity else {
-        "connected": False,
-        "timestamp": None,
-        "disconnectReason": "NOT_PROVISIONED", # custom reason
-        "disconnectReasonDescription": "The client has not been provisioned yet.",
-    }
-
-def _device_info_to_dto(ledger_model):
-    return {
-        "organization": ledger_model["org"],
-        "project": ledger_model["proj"],
-        "provisioningStatus": ledger_model.get("provStatus"),
-        "provisioningTimestamp": _iso_to_timestamp_or_none(ledger_model.get("provTimestamp")),
-        "registrationStatus": ledger_model.get("regStatus"),
-        "registrationTimestamp": _iso_to_timestamp_or_none(ledger_model.get("regTimestamp")),
-    }
-
-def _iso_to_timestamp_or_none(iso_formatted: str | None):
-    if iso_formatted is None:
-        return None
-
-    if iso_formatted.endswith('Z'):
-        iso_formatted = f"{iso_formatted[:-1]}+00:00"
-    return datetime.fromisoformat(iso_formatted).timestamp()
-
-def _merge_models_to_dtos(fleet_items, ledger_items):
-    lookup = {fleet_model['thingName']: fleet_model for fleet_model in fleet_items}
+    Assumes `ledger_items` is a superset of `fleet_items`.
+    """
+    lookup = {fleet_entity['thingName']: fleet_entity for fleet_entity in fleet_items}
     return [
-        _model_to_dto(
-            fleet_model=lookup.get(ledger_model['serialNumber']),
-            ledger_model=ledger_model,
+        entity_to_model(
+            fleet_entity=lookup.get(ledger_entity['serialNumber']),
+            ledger_entity=ledger_entity,
         )
-        for ledger_model in ledger_items
+        for ledger_entity in ledger_items
     ]
