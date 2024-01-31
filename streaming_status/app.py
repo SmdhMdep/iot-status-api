@@ -64,11 +64,12 @@ def pass_provider(route):
 @app.get('/devices')
 @pass_provider
 def list_devices(provider: str):
-    query, page = (
+    query, organization, page = (
         app.current_event.get_query_string_value("query"),
+        app.current_event.get_query_string_value("organization"),
         app.current_event.get_query_string_value("page"),
     )
-    return repo.list_devices(provider=provider, name_like=query, page=page)
+    return repo.list_devices(provider=provider, organization=organization, name_like=query, page=page)
 
 @app.get('/devices/export')
 @pass_provider

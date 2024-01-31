@@ -12,6 +12,7 @@ device_name_regex = re.compile(r'[a-zA-Z0-9:_-]+')
 # attribute names
 REGISTRATION_WAY = 'RegistrationWay'
 SENSOR_PROVIDER = 'SensorProvider'
+SENSOR_ORGANIZATION = 'SensorOrganization'
 
 iot_client = boto3.client("iot", region_name=config.fleet_index_iot_region_name)
 
@@ -19,14 +20,21 @@ iot_client = boto3.client("iot", region_name=config.fleet_index_iot_region_name)
 def list_devices(
     provider: str | None,
     *,
+    organization: str | None = None,
     name_like: str | None = None,
     page: str | None = None,
     page_size: int | None = None
 ):
-    provider_quoted = provider.replace('"', '\\"') if provider else None
     query = f'attributes.{REGISTRATION_WAY}:*'
+
+    provider_quoted = provider.replace('"', '\\"') if provider else None
     if provider_quoted is not None:
         query = f'{query} AND attributes.{SENSOR_PROVIDER}:"{provider_quoted}"'
+
+    organization_quoted = organization.replace('"', '\\"') if organization else None
+    if organization_quoted:
+        query = f'{query} AND attributes.{SENSOR_ORGANIZATION}:"{organization_quoted}"'
+
     if name_like is not None:
         if not device_name_regex.fullmatch(name_like):
             raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
@@ -39,7 +47,6 @@ def list_devices(
     if page_size is not None:
         request_params['maxResults'] = page_size
 
-    # sample: samples/search_index_query_sample.json
     logger.info("search index query: %s", query)
     fleet_result = iot_client.search_index(queryString=query, **request_params)
 

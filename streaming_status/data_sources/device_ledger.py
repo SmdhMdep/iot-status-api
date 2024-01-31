@@ -13,6 +13,7 @@ dynamodb = boto3.resource("dynamodb", region_name=config.device_ledger_table_reg
 def list_devices(
     provider: str | None,
     *,
+    organization: str | None = None,
     name_like: str | None = None,
     page: str | None = None,
     page_size: int | None = None,
@@ -26,7 +27,9 @@ def list_devices(
     except:
         raise AppError.invalid_argument("invalid page key")
 
-    scan_params = _build_scan_params(provider, name_like=name_like, unprovisioned_only=unprovisioned_only)
+    scan_params = _build_scan_params(
+        provider, organization=organization, name_like=name_like, unprovisioned_only=unprovisioned_only
+    )
     next_page, items = _scan_table(scan_params, page=decoded_page, page_size=page_size)
 
     next_page_encoded = (
@@ -38,6 +41,7 @@ def list_devices(
 def _build_scan_params(
     provider: str | None,
     *,
+    organization: str | None,
     name_like: str | None,
     unprovisioned_only: bool,
 ) -> dict:
@@ -46,6 +50,11 @@ def _build_scan_params(
         scan_filter["jwtGroup"] = {
             "ComparisonOperator": "EQ",
             "AttributeValueList": [provider],
+        }
+    if organization is not None:
+        scan_filter["org"] = {
+            "ComparisonOperator": "EQ",
+            "AttributeValueList": [organization],
         }
     if name_like:
         scan_filter["serialNumber"] = {

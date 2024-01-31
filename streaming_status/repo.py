@@ -26,18 +26,25 @@ class PaginatedResult(Generic[_P, _T], TypedDict):
 
 def list_devices(
     provider: str | None,
+    organization: str | None,
     name_like: str | None = None,
     page: str | None = None,
     page_size: int | None = DEFAULT_PAGE_SIZE,
 ) -> PaginatedResult[str, Device]:
-    provider = _canonicalize_provider_name(provider)
+    provider = _canonicalize_group_name(provider)
+    organization = _canonicalize_group_name(organization)
     ledger_page, fleet_page = _load_page(page)
     ledger_items, fleet_items, next_page = [], [], None # type: ignore
 
     is_first_page = not ledger_page and not fleet_page
     if ledger_page or is_first_page:
         next_page, ledger_items = device_ledger.list_devices(
-            provider, name_like=name_like, page=ledger_page, page_size=page_size, unprovisioned_only=True
+            provider,
+            organization=organization,
+            name_like=name_like,
+            page=ledger_page,
+            page_size=page_size,
+            unprovisioned_only=True,
         )
         if next_page:
             next_page = _dump_page(LedgerPage, next_page)
@@ -46,7 +53,11 @@ def list_devices(
     if fleet_page or is_partial_page:
         cont_page_size = page_size - len(ledger_items) if page_size is not None else None
         next_page, fleet_items = fleet_index.list_devices(
-            provider, name_like=name_like, page=fleet_page, page_size=cont_page_size
+            provider,
+            organization=organization,
+            name_like=name_like,
+            page=fleet_page,
+            page_size=cont_page_size,
         )
         if next_page:
             next_page = _dump_page(FleetPage, next_page)
@@ -58,13 +69,13 @@ def list_devices(
     )
 
 def export_devices(provider: str | None) -> list[Device]:
-    provider = _canonicalize_provider_name(provider)
+    provider = _canonicalize_group_name(provider)
     _, fleet_items = fleet_index.list_devices(provider=provider)
     _, ledger_items = device_ledger.list_devices(provider=provider)
     return _merge_entities_to_models(fleet_items, ledger_items)
 
 def get_device(provider: str | None, device_name: str) -> Device:
-    provider = _canonicalize_provider_name(provider)
+    provider = _canonicalize_group_name(provider)
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
 
@@ -104,7 +115,9 @@ def list_providers(
         ]
         return {'items': providers}
 
-def _canonicalize_provider_name(provider: str | None) -> str | None:
+list_organizations = list_providers
+
+def _canonicalize_group_name(provider: str | None) -> str | None:
     return '-'.join(provider.lower().split(' ')) if provider is not None else None
 
 def _load_page(page: str | None) -> tuple[LedgerPage, FleetPage]:
