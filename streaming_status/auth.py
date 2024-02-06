@@ -19,6 +19,10 @@ class Auth:
         return (
             self._introspect_token()
                 .get('resource_access', {})
+                # TODO see if we can use the same client instead of using two clients.
+                # right now we use this client for the roles and the iot-service client
+                # for the service account. This is because the iot-installer-client secret
+                # is exposed to providers.
                 .get('iot-installer-client', {})
                 .get('roles', [])
         )

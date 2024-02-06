@@ -103,19 +103,27 @@ def list_providers(
     page_size: int = DEFAULT_PAGE_SIZE,
 ) -> PaginatedResult[int, str]:
     if auth.is_admin():
-        next_page, providers = keycloak_api.groups(
-            auth.token, name_like=name_like, page=page or 0, page_size=page_size
+        next_page, groups = keycloak_api.groups(
+            name_like=name_like, page=page or 0, page_size=page_size
         )
-        return {'items': providers, 'nextPage': next_page}
+        return {'items': groups, 'nextPage': next_page}
     else:
         name_like = name_like or ''
-        providers = [
+        groups = [
             group for group in auth.group_memberships()
             if name_like in group
         ]
-        return {'items': providers}
+        return {'items': groups}
 
-list_organizations = list_providers
+def list_organizations(
+    name_like: str | None = None,
+    page: int | None = None,
+    page_size: int = DEFAULT_PAGE_SIZE,
+):
+    next_page, groups = keycloak_api.groups(
+        name_like=name_like, page=page or 0, page_size=page_size
+    )
+    return {'items': groups, 'nextPage': next_page}
 
 def _canonicalize_group_name(provider: str | None) -> str | None:
     return '-'.join(provider.lower().split(' ')) if provider is not None else None

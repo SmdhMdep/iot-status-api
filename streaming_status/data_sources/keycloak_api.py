@@ -1,17 +1,48 @@
+import functools
 import requests
 
 from ..config import config
 
 
+def _get_service_account_token() -> str:
+    return _unwrap(requests.post(
+        f'{config.oidc_jwt_issuer_url}/protocol/openid-connect/token',
+        data=dict(
+            client_id=config.oidc_client_id,
+            client_secret=config.oidc_client_secret,
+            grant_type='client_credentials',
+        ),
+    ))['access_token']
+
+
+_cached_token = None
+
+
+def _use_service_token(function):
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        global _cached_token
+        if _cached_token is not None:
+            try:
+                return function(*args, **kwargs, token=_cached_token)
+            except requests.HTTPError as e:
+                if e.response.status_code != 401: # unauthorized, probably token expired
+                    raise
+
+        _cached_token = _get_service_account_token()
+        return function(*args, **kwargs, token=_cached_token)
+
+    return wrapper
+
 def introspect_oidc_token(token: str) -> dict:
     return _unwrap(requests.post(
         f'{config.oidc_jwt_issuer_url}/protocol/openid-connect/token/introspect',
         auth=(config.oidc_client_id, config.oidc_client_secret),
-        data=f'token={token}',
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data=dict(token=token),
     ))
 
-def groups(token, name_like: str | None, page: int, page_size: int) -> tuple[int | None, list[str]]:
+@_use_service_token
+def groups(name_like: str | None, page: int, page_size: int, *, token) -> tuple[int | None, list[str]]:
     params: dict = {'max': page_size, 'first': page * page_size}
     if name_like is not None:
         params['search'] = name_like

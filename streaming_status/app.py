@@ -9,7 +9,7 @@ from . import repo
 from .auth import Auth
 from .config import config
 from .errors import AppError
-from .utils import logger
+from .utils import get_query_integer_value, logger
 
 
 cors = CORSConfig(allow_origin=config.cors_allowed_origin, max_age=300, allow_credentials=True)
@@ -104,17 +104,18 @@ def get_device(device_name: str, provider: str):
 
 @app.get('/providers')
 def list_providers():
-    query, page_arg = (
+    query, page = (
         app.current_event.get_query_string_value("query"),
-        app.current_event.get_query_string_value("page", "0"),
+        get_query_integer_value(app.current_event, "page"),
     )
+    return repo.list_providers(get_auth(app), name_like=query, page=page)
 
-    try:
-        page = int(page_arg) if page_arg else None
-    except ValueError:
-        raise AppError.invalid_argument("page must be a number")
-    else:
-        return repo.list_providers(get_auth(app), name_like=query, page=page)
+@app.get('/organizations')
+def list_organizations():
+    return repo.list_organizations(
+        name_like=app.current_event.get_query_string_value("query"),
+        page=get_query_integer_value(app.current_event, "page"),
+    )
 
 @logger.inject_lambda_context(correlation_id_path=API_GATEWAY_HTTP)
 def handler(event: dict, context: LambdaContext) -> dict:
