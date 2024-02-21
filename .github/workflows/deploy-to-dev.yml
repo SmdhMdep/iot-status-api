@@ -7,6 +7,7 @@ jobs:
         name: Deploy to Dev staging server
         runs-on: ubuntu-latest
         permissions:
+            id-token: write
             contents: read
 
 
@@ -24,8 +25,18 @@ jobs:
                 npm install -g serverless
                 npm install
             
-            - name: Create python virtual environment and install dependencies
+            - name: Install python dependencies
               run: |      
-                python -m venv .venv
-                source .venv/bin/activate
                 python -m pip install -r requirements/dev.txt
+            
+            - name: Authenticate AWS
+              uses: aws-actions/configure-aws-credentials@v4.0.2
+              with:
+                aws-region: eu-west-2
+                role-to-assume: ${{ secrets.ROLE_OIDC }}
+            
+            # - name: Retrieve github secrets and set to environment
+            #   uses: aws-actions/aws-secretsmanager-get-secrets@v2.0.1
+            #   with: 
+            
+
