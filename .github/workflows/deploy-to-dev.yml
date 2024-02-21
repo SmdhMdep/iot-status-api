@@ -40,6 +40,6 @@ jobs:
               uses: aws-actions/aws-secretsmanager-get-secrets@v2.0.1
               with: 
                 secret-ids: |
-                    ${{ secrets.AWS_SECRET_ARN }}
+                    ${{ secrets.AWS_SECRET_NAME }}
             
 
