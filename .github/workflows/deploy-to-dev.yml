@@ -4,7 +4,7 @@ on:
     workflow_dispatch:
 jobs:
     deploy:
-        name: Deploy to Dev staging server
+        name: Deploy to development staging server
         runs-on: ubuntu-latest
         permissions:
             id-token: write
