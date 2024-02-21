@@ -38,6 +38,7 @@ jobs:
               run: |
                 aws secretsmanager get-secret-value --secret-id ${{ secrets.AWS_SECRET_ARN }} | jq -r ".SecretString" >> dev.env
             
-        
+            - name: Deploy
+              run: sls deploy --stage dev
             
 
