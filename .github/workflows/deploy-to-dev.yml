@@ -32,7 +32,7 @@ jobs:
             - name: Authenticate AWS
               uses: aws-actions/configure-aws-credentials@v4.0.2
               with:
-                aws-region: eu-west-2
+                aws-region: eu-west-1
                 role-to-assume: ${{ secrets.ROLE_OIDC }}
             
             
@@ -40,6 +40,7 @@ jobs:
               uses: aws-actions/aws-secretsmanager-get-secrets@v2.0.1
               with: 
                 secret-ids: |
-                    ${{ secrets.AWS_SECRET_NAME }}
+                    test
+                    # ${{ secrets.AWS_SECRET_ARN }}
             
 
