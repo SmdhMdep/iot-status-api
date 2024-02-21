@@ -20,14 +20,13 @@ jobs:
               with:
                 python-version: '3.11' 
 
-            - name: Install npm dependencies
+            - name: Install dependencies
               run: |
+                sudo apt-get install jq
                 npm install -g serverless
                 npm install
-            
-            - name: Install python dependencies
-              run: |      
                 python -m pip install -r requirements/dev.txt
+
             
             - name: Authenticate AWS
               uses: aws-actions/configure-aws-credentials@v4.0.2
@@ -35,11 +34,10 @@ jobs:
                 aws-region: eu-west-1
                 role-to-assume: ${{ secrets.ROLE_OIDC }}
             
+            - name: Retrieve AWS secrets
+              run: |
+                aws secretsmanager get-secret-value --secret-id ${{ secrets.AWS_SECRET_ARN }} | jq -r ".SecretString" >> dev.env
             
-            - name: Retrieve github secrets and set to environment
-              uses: aws-actions/aws-secretsmanager-get-secrets@v2.0.1
-              with: 
-                secret-ids: |
-                    ${{ secrets.AWS_SECRET_ARN }}
+        
             
 
