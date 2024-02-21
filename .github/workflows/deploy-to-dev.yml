@@ -6,21 +6,26 @@ jobs:
     deploy:
         name: Deploy to Dev staging server
         runs-on: ubuntu-latest
-
         permissions:
             contents: read
 
+
         steps:
-            - name: Set up python version and virtual environment
-            - uses: actions/checkout@v4
-            - uses: actions/setup-python@v5
+            - name: Commit the code to the workflow
+              uses: actions/checkout@v4
+            
+            - name: Use the correct python version
+              uses: actions/setup-python@v5
               with:
                 python-version: '3.11' 
 
-            - name: install dependencies
-            - run: |
+            - name: Install npm dependencies
+              run: |
                 npm install -g serverless
                 npm install
+            
+            - name: Create python virtual environment and install dependencies
+              run: |      
                 python -m venv .venv
                 source .venv/bin/activate
                 python -m pip install -r requirements/dev.txt
