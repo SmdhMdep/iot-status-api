@@ -35,8 +35,11 @@ jobs:
                 aws-region: eu-west-2
                 role-to-assume: ${{ secrets.ROLE_OIDC }}
             
-            # - name: Retrieve github secrets and set to environment
-            #   uses: aws-actions/aws-secretsmanager-get-secrets@v2.0.1
-            #   with: 
+            
+            - name: Retrieve github secrets and set to environment
+              uses: aws-actions/aws-secretsmanager-get-secrets@v2.0.1
+              with: 
+                secret-ids: |
+                    ${{ secrets.AWS_SECRET_ARN }}
             
 
