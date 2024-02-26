@@ -2,6 +2,15 @@ name: Deploy IoT status api to development (staging) server
 
 on:
     workflow_dispatch:
+      inputs:
+        environment:
+          description: Whether the workflow should deploy to production or development server
+          required: true
+          default: development
+          type: choice
+          options:
+            - development
+            - production
 jobs:
     deploy:
         name: Deploy to development staging server
@@ -10,15 +19,9 @@ jobs:
             id-token: write
             contents: read
 
-
         steps:
-            - name: Commit the code to the workflow
+            - name: Checking out the code to the workflow
               uses: actions/checkout@v4
-            
-            - name: Use the correct python version
-              uses: actions/setup-python@v5
-              with:
-                python-version: '3.11' 
 
             - name: Install dependencies
               run: |
@@ -26,7 +29,7 @@ jobs:
                 npm install -g serverless
                 npm install
             
-            - name: Authenticate AWS
+            - name: Configure AWS credentials
               uses: aws-actions/configure-aws-credentials@v4.0.2
               with:
                 aws-region: eu-west-1
