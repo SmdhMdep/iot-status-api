@@ -1,0 +1,45 @@
+name: Deploy IoT status api to development (staging) server
+
+on:
+    workflow_dispatch:
+      inputs:
+        environment:
+          description: Whether the workflow should deploy to production or development server
+          required: true
+          default: development
+          type: choice
+          options:
+            - development
+            - production
+jobs:
+    deploy:
+        name: Deploy to development staging server
+        runs-on: ubuntu-latest
+        permissions:
+            id-token: write
+            contents: read
+
+        steps:
+            - name: Checking out the code to the workflow
+              uses: actions/checkout@v4
+
+            - name: Install dependencies
+              run: |
+                sudo apt-get install jq
+                npm install -g serverless
+                npm install
+            
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4.0.2
+              with:
+                aws-region: eu-west-1
+                role-to-assume: ${{ secrets.ROLE_OIDC }}
+            
+            - name: Retrieve AWS secrets
+              run: |
+                aws secretsmanager get-secret-value --secret-id ${{ secrets.AWS_SECRET_ARN }} | jq -r ".SecretString" >> dev.env
+            
+            - name: Deploy
+              run: sls deploy --stage dev
+            
+
