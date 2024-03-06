@@ -35,4 +35,8 @@ class Auth:
             self._introspected_token
             or keycloak_api.introspect_oidc_token(self.token)
         )
+
+        if not self._introspected_token.get('active', True):
+            raise AppError.unauthorized("inactive token")
+
         return self._introspected_token

@@ -97,23 +97,14 @@ def get_device(provider: str | None, device_name: str) -> Device:
     return entity_to_model(fleet_entity=fleet_device, ledger_entity=ledger_device, stream_preview=preview)
 
 def list_providers(
-    auth: Auth,
     name_like: str | None = None,
     page: int | None = None,
     page_size: int = DEFAULT_PAGE_SIZE,
 ) -> PaginatedResult[int, str]:
-    if auth.is_admin():
-        next_page, groups = keycloak_api.groups(
-            name_like=name_like, page=page or 0, page_size=page_size
-        )
-        return {'items': groups, 'nextPage': next_page}
-    else:
-        name_like = name_like or ''
-        groups = [
-            group for group in auth.group_memberships()
-            if name_like in group
-        ]
-        return {'items': groups}
+    next_page, groups = keycloak_api.groups(
+        name_like=name_like, page=page or 0, page_size=page_size
+    )
+    return {'items': groups, 'nextPage': next_page}
 
 def list_organizations(
     name_like: str | None = None,

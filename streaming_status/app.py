@@ -24,42 +24,74 @@ def route_exception_handler(error: AppError):
         body=json.dumps({'message': error.args[0]}),
     )
 
+
+def cache_in_context(app: APIGatewayHttpResolver, key: str):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            value = app.context.get(key)
+            if value is None:
+                value = func(*args, **kwargs)
+                app.context[key] = value
+            return value
+
+        return wrapper
+    return decorator
+
+
+@cache_in_context(app, 'auth')
 def get_auth(app: APIGatewayHttpResolver) -> Auth:
     """Returns the `Auth` object for the current event context."""
-    auth = app.context.get('auth')
-    if auth is None:
-        auth = Auth(app.current_event)
-        app.append_context(auth=auth)
-    return auth
+    return Auth(app.current_event)
+
+
+@cache_in_context(app, 'provider')
+def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
+    """Returns the provider associated with the current user for the request."""
+    auth = get_auth(app)
+    requested_provider = app.current_event.get_query_string_value('provider')
+
+    if auth.is_admin():
+        provider = requested_provider
+    else:
+        groups = auth.group_memberships()
+        if not groups:
+            raise AppError.invalid_argument('missing groups')
+
+        provider = requested_provider or groups[0]
+        if provider not in groups:
+            raise AppError.invalid_argument(f"provider not in groups: {provider}")
+
+    return provider
+
+
+def _offline_pass_provider(route):
+    @functools.wraps(route)
+    def wrapper(*args, **kwargs):
+        requested_provider = app.current_event.get_query_string_value('provider')
+        is_admin = app.current_event.get_query_string_value('admin', 'false') == 'true'
+        return route(*args, **kwargs, provider=requested_provider if not is_admin else None)
+
+    return wrapper
+
 
 def pass_provider(route):
     """Decorator for passing the selected provider to a route based on the current event.
 
     The decorated route must accept a keyword argument named `provider`.
     """
+    if config.is_offline:
+        return _offline_pass_provider(route)
+
     @functools.wraps(route)
     def wrapper(*args, **kwargs):
-        requested_provider = app.current_event.get_query_string_value('provider')
-        if config.is_offline:
-            is_admin = app.current_event.get_query_string_value('admin', 'false') == 'true'
-            return route(*args, **kwargs, provider=requested_provider if not is_admin else None)
-
-        if get_auth(app).is_admin():
-            return route(*args, **kwargs, provider=requested_provider)
-
-        groups = get_auth(app).group_memberships()
-        if not groups:
-            raise AppError.invalid_argument('missing groups')
-
-        provider = requested_provider or groups[0]
-        if provider not in groups:
-            raise AppError.invalid_argument('provider not in groups: %s', provider)
-
+        provider = get_request_provider(app)
         logger.info("request for provider %s", provider)
         logger.append_keys(provider=provider)
         return route(*args, **kwargs, provider=provider)
 
     return wrapper
+
 
 @app.get('/devices')
 @pass_provider
@@ -70,6 +102,7 @@ def list_devices(provider: str):
         app.current_event.get_query_string_value("page"),
     )
     return repo.list_devices(provider=provider, organization=organization, name_like=query, page=page)
+
 
 @app.get('/devices/export')
 @pass_provider
@@ -97,18 +130,26 @@ def export_devices(provider: str):
         compress=compress,
     )
 
+
 @app.get('/devices/<device_name>')
 @pass_provider
 def get_device(device_name: str, provider: str):
     return repo.get_device(provider=provider, device_name=device_name)
 
+
 @app.get('/providers')
 def list_providers():
+    auth = get_auth(app)
     query, page = (
         app.current_event.get_query_string_value("query"),
         get_query_integer_value(app.current_event, "page"),
     )
-    return repo.list_providers(get_auth(app), name_like=query, page=page)
+
+    if not auth.is_admin():
+        raise AppError.unauthorized("unauthorized")
+
+    return repo.list_providers(name_like=query, page=page)
+
 
 @app.get('/organizations')
 def list_organizations():
@@ -116,6 +157,7 @@ def list_organizations():
         name_like=app.current_event.get_query_string_value("query"),
         page=get_query_integer_value(app.current_event, "page"),
     )
+
 
 @logger.inject_lambda_context(correlation_id_path=API_GATEWAY_HTTP)
 def handler(event: dict, context: LambdaContext) -> dict:
