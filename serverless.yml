@@ -67,6 +67,11 @@ provider:
           Resource:
             - arn:aws:s3:::${self:custom.dotenv.STREAM_DATA_BUCKET_NAME}
             - arn:aws:s3:::${self:custom.dotenv.STREAM_DATA_BUCKET_NAME}/*
+        - Effect: Allow
+          Action:
+            - sns:*
+          Resource:
+            - ${self:custom.dotenv.DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX}*
 
 package:
   individually: true

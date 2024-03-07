@@ -1,5 +1,6 @@
 import os
 
+
 class _Config:
     @property
     def is_offline(self) -> bool:
@@ -56,6 +57,19 @@ class _Config:
     @property
     def mdep_api_key(self) -> str:
         return os.environ['MDEP_API_KEY']
+
+    @property
+    def device_alarms_dest_sns_topic_name_prefix(self) -> str:
+        arn = os.environ["DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX"]
+        return arn.rsplit(':', maxsplit=1)[-1]
+
+    @property
+    def device_alarms_table_name(self) -> str:
+        return 'device_alarms_subscriptions'
+
+    @property
+    def device_alarms_table_region(self) -> str:
+        return 'eu-west-1'
 
 
 config = _Config()

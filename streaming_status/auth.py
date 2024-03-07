@@ -12,6 +12,9 @@ class Auth:
         self._introspected_token: dict | None = None
         self._groups: list[str] | None = None
 
+    def email(self) -> str:
+        return self._introspect_token()['email']
+
     def group_memberships(self) -> list[str]:
         return self._introspect_token().get('groups', [])
 

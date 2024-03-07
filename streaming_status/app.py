@@ -175,6 +175,32 @@ def device_connectivity(device_name):
     return metrics.get_connectivity_metric(device_name, date_range, page=page)
 
 
+@app.get('/devices/<device_name>/monitoring/subscription')
+@check_device_access
+def get_device_alarms_subscription(device_name: str):
+    from .data_sources import alarms
+
+    return alarms.get_device_alarms_subscription(device_name, get_auth(app).email())
+
+
+@app.post('/devices/<device_name>/monitoring/subscription/subscribe')
+@check_device_access
+def subscribe_device_alarms(device_name: str):
+    from .data_sources import alarms
+
+    alarms.subscribe_to_device_alarms(device_name, get_auth(app).email())
+    return Response(status_code=204)
+
+
+@app.post('/devices/<device_name>/monitoring/subscription/unsubscribe')
+@check_device_access
+def post_device_alarms_unsubscribe(device_name: str):
+    from .data_sources import alarms
+
+    alarms.unsubscribe_to_device_alarms(device_name, get_auth(app).email())
+    return Response(status_code=204)
+
+
 @app.get('/providers')
 def list_providers():
     auth = get_auth(app)
