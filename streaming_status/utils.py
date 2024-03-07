@@ -14,3 +14,23 @@ def get_query_integer_value(event: BaseProxyEvent, name: str, default: int = 0) 
         return int(arg) if arg is not None else default
     except ValueError:
         raise AppError.invalid_argument(f"{name} must be an integer")
+
+
+def parse_date_range_or_default(range_value):
+    from datetime import datetime, timedelta
+
+    if range_value is not None:
+        try:
+            start, end = range_value.split(',')
+            start_date, end_date = (
+                datetime.fromtimestamp(int(start)),
+                datetime.fromtimestamp(int(end))
+            )
+        except (ValueError, OverflowError):
+            raise AppError.invalid_argument("invalid date range format")
+    else:
+        current_date = datetime.now()
+        start_date = current_date - timedelta(days=1)
+        end_date = current_date
+
+    return (start_date, end_date)

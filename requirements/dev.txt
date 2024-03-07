@@ -10,7 +10,7 @@ aws-xray-sdk==2.12.1
     # via aws-lambda-powertools
 boto3==1.28.65
     # via -r requirements/dev.in
-boto3-stubs[essential,iot]==1.28.65
+boto3-stubs[cloudwatch,essential,iot]==1.28.65
     # via -r requirements/dev.in
 botocore==1.31.65
     # via
@@ -32,6 +32,8 @@ jmespath==1.0.1
     #   boto3
     #   botocore
 mypy-boto3-cloudformation==1.28.64
+    # via boto3-stubs
+mypy-boto3-cloudwatch==1.28.36
     # via boto3-stubs
 mypy-boto3-dynamodb==1.28.55
     # via boto3-stubs
@@ -68,6 +70,7 @@ typing-extensions==4.8.0
     #   aws-lambda-powertools
     #   boto3-stubs
     #   mypy-boto3-cloudformation
+    #   mypy-boto3-cloudwatch
     #   mypy-boto3-dynamodb
     #   mypy-boto3-ec2
     #   mypy-boto3-iot

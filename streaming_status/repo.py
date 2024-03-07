@@ -74,7 +74,7 @@ def export_devices(provider: str | None) -> list[Device]:
     _, ledger_items = device_ledger.list_devices(provider=provider)
     return _merge_entities_to_models(fleet_items, ledger_items)
 
-def get_device(provider: str | None, device_name: str) -> Device:
+def get_device(provider: str | None, device_name: str, brief_repr: bool = False) -> Device:
     provider = _canonicalize_group_name(provider)
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
@@ -82,6 +82,8 @@ def get_device(provider: str | None, device_name: str) -> Device:
     ledger_device = device_ledger.find_device(provider, device_name)
     if not ledger_device:
         raise AppError.not_found(f'device with name {device_name} is not registered')
+    if brief_repr:
+        return entity_to_model(ledger_entity=ledger_device)
 
     fleet_device = fleet_index.find_device(provider, device_name)
 

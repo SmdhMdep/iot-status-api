@@ -9,7 +9,7 @@ from . import repo
 from .auth import Auth
 from .config import config
 from .errors import AppError
-from .utils import get_query_integer_value, logger
+from .utils import logger, get_query_integer_value, parse_date_range_or_default
 
 
 cors = CORSConfig(allow_origin=config.cors_allowed_origin, max_age=300, allow_credentials=True)
@@ -135,6 +135,44 @@ def export_devices(provider: str):
 @pass_provider
 def get_device(device_name: str, provider: str):
     return repo.get_device(provider=provider, device_name=device_name)
+
+
+def check_device_access(func):
+    """Check that the current user has access to the device"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        provider = get_request_provider(app)
+        # make sure the provider has access to this device
+        device_name = kwargs['device_name']
+        _ = repo.get_device(provider, device_name, brief_repr=True)
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+@app.get('/devices/<device_name>/monitoring/activity')
+@check_device_access
+def device_activity(device_name):
+    from .data_sources import metrics
+
+    range_query = app.current_event.get_query_string_value("range")
+    date_range = parse_date_range_or_default(range_query)
+
+    return metrics.get_activity_metric(device_name, date_range)
+
+
+@app.get('/devices/<device_name>/monitoring/connectivity')
+@check_device_access
+def device_connectivity(device_name):
+    from .data_sources import metrics
+
+    range_query, page = (
+        app.current_event.get_query_string_value("range"),
+        app.current_event.get_query_string_value("page"),
+    )
+    date_range = parse_date_range_or_default(range_query)
+
+    return metrics.get_connectivity_metric(device_name, date_range, page=page)
 
 
 @app.get('/providers')
