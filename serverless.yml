@@ -71,6 +71,7 @@ provider:
           Action:
             - sns:*
           Resource:
+            - ${self:custom.dotenv.DEVICES_ALARMS_SRC_SNS_TOPIC_ARN}
             - ${self:custom.dotenv.DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX}*
 
 package:
@@ -97,6 +98,22 @@ functions:
       - httpApi:
           path: /api/{proxy+}
           method: OPTIONS
+
+  devicesAlarmsRouter:
+    # TODO separate requirements file.
+    handler: alarms_router.handler.route_alarm_notification
+    description: SNS devices alarms notifications router
+    package:
+      patterns:
+        - "!**"
+        - alarms_router/**
+    environment: ${self:custom.dotenv}
+    layers:
+      # depends on the architecture
+      - arn:aws:lambda:${aws:region}:017000801446:layer:AWSLambdaPowertoolsPythonV2:46
+    events:
+      - sns:
+          arn: ${self:custom.dotenv.DEVICES_ALARMS_SRC_SNS_TOPIC_ARN}
 
 plugins:
   - serverless-python-requirements

@@ -1,0 +1,24 @@
+{
+    "violationEventTime": 1707940200000,
+    "thingName": "SMDH2S1",
+    "verificationState": "UNKNOWN",
+    "behavior": {
+        "criteria": {
+            "consecutiveDatapointsToClear": 1,
+            "value": {
+                "count": 5
+            },
+            "consecutiveDatapointsToAlarm": 1,
+            "comparisonOperator": "less-than-equals"
+        },
+        "name": "Disconnect_duration",
+        "metric": "aws:disconnect-duration",
+        "exportMetric": false
+    },
+    "violationEventType": "in-alarm",
+    "metricValue": {
+        "count": 5
+    },
+    "violationId": "c191b73a2e8546845bb72723a75e3d37",
+    "securityProfileName": "security_profile_name"
+}
