@@ -26,7 +26,7 @@ def get_device_alarms_subscription(device_name: str, email: str):
 
 def subscribe_to_device_alarms(device_name: str, email: str):
     # TODO topic name constraints
-    topic_name = f"{config.device_alarms_dest_sns_topic_prefix}_{device_name}"
+    topic_name = f"{config.device_alarms_dest_sns_topic_name_prefix}_{device_name}"
     topic_arn = _create_topic_if_not_exists(topic_name)
     subscription_arn = _subscribe_to_topic(topic_arn, email)
     _put_subscription_record(subscription_arn, device_name, email)

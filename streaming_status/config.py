@@ -61,11 +61,11 @@ class _Config:
 
     @property
     def device_alarms_table_name(self) -> str:
-        return 'device_alarms_subscriptions'
+        return os.environ["DEVICE_ALARMS_TABLE_NAME"]
 
     @property
     def device_alarms_table_region(self) -> str:
-        return 'eu-west-1'
+        return os.environ["DEVICE_ALARMS_TABLE_REGION"]
 
 
 config = _Config()

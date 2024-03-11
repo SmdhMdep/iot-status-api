@@ -25,7 +25,7 @@ provider:
       allowedOrigins:
         - ${self:custom.dotenv.CORS_ALLOWED_ORIGIN}
     authorizers:
-      jwtAuthorizer:
+      tokenAuthorizer:
         type: jwt
         identitySource: $request.header.Authorization
         issuerUrl: ${self:custom.dotenv.OIDC_JWT_ISSUER_URL}
@@ -34,13 +34,17 @@ provider:
   iam:
     role:
       statements:
+        # Read all
+        - Effect: Allow
+          Action:
+            - iot:ListMetricValues
+            - cloudwatch:GetMetricData
+          Resource:
+            - "*"
+        # Read resources
         - Effect: Allow
           Action:
             - iot:SearchIndex
-          Resource:
-            - !Sub arn:aws:iot:${self:custom.dotenv.FLEET_INDEX_IOT_REGION_NAME}:${AWS::AccountId}:index/AWS_Things
-        - Effect: Allow
-          Action:
             - dynamodb:BatchGetItem
             - dynamodb:ConditionCheckItem
             - dynamodb:Get*
@@ -48,21 +52,22 @@ provider:
             - dynamodb:Query
             - dynamodb:List*
             - dynamodb:Describe*
-          Resource:
-            - !Sub arn:aws:dynamodb:${self:custom.dotenv.DEVICE_LEDGER_TABLE_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.DEVICE_LEDGER_TABLE_NAME}
-        - Effect: Allow
-          Action:
             - s3:Get*
             - s3:List*
           Resource:
+            - !Sub arn:aws:iot:${self:custom.dotenv.FLEET_INDEX_IOT_REGION_NAME}:${AWS::AccountId}:index/AWS_Things
+            - !Sub arn:aws:dynamodb:${self:custom.dotenv.DEVICE_LEDGER_TABLE_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.DEVICE_LEDGER_TABLE_NAME}
             - arn:aws:s3:::${self:custom.dotenv.STREAM_DATA_BUCKET_NAME}
             - arn:aws:s3:::${self:custom.dotenv.STREAM_DATA_BUCKET_NAME}/*
+        # Managed resources
         - Effect: Allow
           Action:
             - sns:*
+            - dynamodb:*
           Resource:
             - ${self:custom.dotenv.DEVICES_ALARMS_SRC_SNS_TOPIC_ARN}
             - ${self:custom.dotenv.DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX}*
+            - !Sub arn:aws:dynamodb:${self:custom.dotenv.DEVICE_ALARMS_TABLE_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.DEVICE_ALARMS_TABLE_NAME}
 
 package:
   individually: true
@@ -82,7 +87,7 @@ functions:
     events:
       - httpApi:
           authorizer:
-            name: jwtAuthorizer
+            name: tokenAuthorizer
           path: /api/{proxy+}
           method: "*"
       - httpApi:
