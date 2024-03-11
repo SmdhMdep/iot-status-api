@@ -23,10 +23,6 @@ class _Config:
         return os.environ['KEYCLOAK_ADMIN_API_BASE_URL']
 
     @property
-    def admin_role(self) -> str:
-        return 'iot-installer-admin-client-role'
-
-    @property
     def cors_allowed_origin(self) -> str:
         return os.environ['CORS_ALLOWED_ORIGIN']
 

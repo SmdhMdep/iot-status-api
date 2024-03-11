@@ -6,7 +6,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConf
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 from . import repo
-from .auth import Auth
+from .auth import Auth, Role
 from .config import config
 from .errors import AppError
 from .utils import logger, get_query_integer_value, parse_date_range_or_default
@@ -51,7 +51,7 @@ def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
     auth = get_auth(app)
     requested_provider = app.current_event.get_query_string_value('provider')
 
-    if auth.is_admin():
+    if auth.has_role(Role.admin) or auth.has_role(Role.data_scientist):
         provider = requested_provider
     else:
         groups = auth.group_memberships()
@@ -69,8 +69,7 @@ def _offline_pass_provider(route):
     @functools.wraps(route)
     def wrapper(*args, **kwargs):
         requested_provider = app.current_event.get_query_string_value('provider')
-        is_admin = app.current_event.get_query_string_value('admin', 'false') == 'true'
-        return route(*args, **kwargs, provider=requested_provider if not is_admin else None)
+        return route(*args, **kwargs, provider=requested_provider)
 
     return wrapper
 
@@ -91,6 +90,27 @@ def pass_provider(route):
         return route(*args, **kwargs, provider=provider)
 
     return wrapper
+
+
+def require_role(roles: list[Role]):
+    """Guard a route with a required role.
+
+    The current user must be assigned one of the `roles` to access the route.
+    No-op in offline mode.
+    """
+    def decorator(func):
+        if config.is_offline:
+            return func
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            auth = get_auth(app)
+            if any(auth.has_role(role) for role in roles):
+                return func(*args, **kwargs)
+            raise AppError.unauthorized()
+
+        return wrapper
+    return decorator
 
 
 @app.get('/devices')
@@ -142,9 +162,11 @@ def check_device_access(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         provider = get_request_provider(app)
-        # make sure the provider has access to this device
-        device_name = kwargs['device_name']
-        _ = repo.get_device(provider, device_name, brief_repr=True)
+        if provider is not None:
+            # make sure the provider has access to this device
+            device_name = kwargs['device_name']
+            _ = repo.get_device(provider, device_name, brief_repr=True)
+
         return func(*args, **kwargs)
 
     return wrapper
@@ -202,15 +224,12 @@ def post_device_alarms_unsubscribe(device_name: str):
 
 
 @app.get('/providers')
+@require_role([Role.admin, Role.data_scientist])
 def list_providers():
-    auth = get_auth(app)
     query, page = (
         app.current_event.get_query_string_value("query"),
         get_query_integer_value(app.current_event, "page"),
     )
-
-    if not auth.is_admin():
-        raise AppError.unauthorized("unauthorized")
 
     return repo.list_providers(name_like=query, page=page)
 

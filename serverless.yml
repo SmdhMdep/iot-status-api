@@ -3,21 +3,6 @@ frameworkVersion: "3"
 
 custom:
   dotenv: ${file(./dotenv_loader.js)}
-  jwtAuthorizer:
-    prod:
-      # custom authorizer in production is required to verify the role of the user
-      type: request
-      functionArn: !Sub arn:aws:lambda:${self:provider.region}:${AWS::AccountId}:function:${self:custom.dotenv.AUTH_FUNCTION_NAME, ''}
-      payloadVersion: "1.0"
-      resultTtlInSeconds: 0
-      identitySource:
-        - $request.header.Authorization
-    dev:
-      type: jwt
-      identitySource: $request.header.Authorization
-      issuerUrl: ${self:custom.dotenv.OIDC_JWT_ISSUER_URL}
-      audience:
-        - ${self:custom.dotenv.OIDC_CLIENT_ID}
 
 provider:
   name: aws
@@ -40,7 +25,12 @@ provider:
       allowedOrigins:
         - ${self:custom.dotenv.CORS_ALLOWED_ORIGIN}
     authorizers:
-      jwtAuthorizer: ${self:custom.jwtAuthorizer.${opt:stage}}
+      jwtAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: ${self:custom.dotenv.OIDC_JWT_ISSUER_URL}
+        audience:
+          - ${self:custom.dotenv.OIDC_CLIENT_ID}
   iam:
     role:
       statements:
