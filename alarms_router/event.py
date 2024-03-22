@@ -21,6 +21,6 @@ DisconnectionNotification = TypedDict("DisconnectionNotification", {
     "thingName": str,
     "criteria": DisconnectionNotificationCriteria,
     "securityProfileName": str,
-    "violationEventType": Literal["in-alarm", "alarm-cleared"],
+    "violationEventType": Literal["in-alarm", "alarm-cleared", "alarm-invalidated"],
     "metricValue": DisconnectionNotificationMetricValue,
 })

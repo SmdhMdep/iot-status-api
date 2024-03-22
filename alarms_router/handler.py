@@ -34,13 +34,18 @@ def route_alarm_notification(event: dict, _):
     device_name = notification["thingName"]
     device_connectivity = (
         "disconnected" if notification["violationEventType"] == "in-alarm"
-        else "connected"
+        else "connected" if notification["violationEventType"] == "alarm-cleared"
+        else "invalidated"
     )
-    logger.append_keys(alarm_details={
+    logger.append_keys(violation_event_details={
         'device_name': device_name,
-        'connectivity_status': device_connectivity,
+        'event_type': notification["violationEventType"],
         'event_timestamp': notification["violationEventTime"] / 1000,
     })
+
+    if device_connectivity == 'invalidated':
+        logger.warning("skipping routing of invalidated alarm notification")
+        return
 
     date = datetime.fromtimestamp(notification["violationEventTime"] / 1000)
     subject = SUBJECT_TEMPLATE.format(device_name=device_name)
