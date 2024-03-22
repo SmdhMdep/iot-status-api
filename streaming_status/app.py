@@ -51,7 +51,7 @@ def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
     auth = get_auth(app)
     requested_provider = app.current_event.get_query_string_value('provider')
 
-    if auth.has_role(Role.admin) or auth.has_role(Role.data_scientist):
+    if auth.has_role(Role.admin, Role.data_scientist):
         provider = requested_provider
     else:
         groups = auth.group_memberships()
@@ -63,6 +63,28 @@ def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
             raise AppError.invalid_argument(f"provider not in groups: {provider}")
 
     return provider
+
+
+@cache_in_context(app, 'organization')
+def get_request_organization(app: APIGatewayHttpResolver) -> str | None:
+    """Returns the organization associated with the current user for the request."""
+    auth = get_auth(app)
+    requested_organization = app.current_event.get_query_string_value('organization')
+
+    if (
+        auth.has_role(Role.admin, Role.data_scientist, Role.installer)
+    ):
+        organization = requested_organization
+    else:
+        groups = auth.group_memberships()
+        if not groups:
+            raise AppError.invalid_argument('missing groups')
+
+        organization = requested_organization or groups[0]
+        if organization not in groups:
+            raise AppError.invalid_argument(f"organization not in groups: {organization}")
+
+    return organization
 
 
 def _offline_pass_provider(route):
@@ -115,10 +137,10 @@ def require_role(roles: list[Role]):
 
 @app.get('/devices')
 @pass_provider
-def list_devices(provider: str):
+def list_devices(provider: str | None):
     query, organization, page = (
         app.current_event.get_query_string_value("query"),
-        app.current_event.get_query_string_value("organization"),
+        get_request_organization(app),
         app.current_event.get_query_string_value("page"),
     )
     return repo.list_devices(provider=provider, organization=organization, name_like=query, page=page)
@@ -126,7 +148,7 @@ def list_devices(provider: str):
 
 @app.get('/devices/export')
 @pass_provider
-def export_devices(provider: str):
+def export_devices(provider: str | None):
     requested_format, compress = (
         app.current_event.get_query_string_value("format", "csv"),
         app.current_event.get_query_string_value("compress", "1") == "1",
@@ -153,7 +175,7 @@ def export_devices(provider: str):
 
 @app.get('/devices/<device_name>')
 @pass_provider
-def get_device(device_name: str, provider: str):
+def get_device(device_name: str, provider: str | None):
     return repo.get_device(provider=provider, device_name=device_name)
 
 
@@ -235,6 +257,7 @@ def list_providers():
 
 
 @app.get('/organizations')
+@require_role([Role.admin, Role.data_scientist, Role.installer])
 def list_organizations():
     return repo.list_organizations(
         name_like=app.current_event.get_query_string_value("query"),

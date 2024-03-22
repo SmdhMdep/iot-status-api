@@ -11,6 +11,7 @@ class Role(StrEnum):
     admin = 'admin'
     installer = 'installer'
     data_scientist = 'data-scientist'
+    organization_member = 'org-member'
 
 
 class Auth:
@@ -27,7 +28,7 @@ class Auth:
     def group_memberships(self) -> list[str]:
         return self._introspect_token().get('groups', [])
 
-    def roles(self) -> list[Role]:
+    def _roles(self) -> list[str]:
         return (
             self._introspect_token()
                 .get('resource_access', {})
@@ -35,8 +36,9 @@ class Auth:
                 .get('roles', [])
         )
 
-    def has_role(self, role: Role) -> bool:
-        return role in self.roles()
+    def has_role(self, *roles: Role) -> bool:
+        user_roles = self._roles()
+        return any(role in user_roles for role in roles)
 
     def _introspect_token(self) -> dict:
         self._introspected_token = (
