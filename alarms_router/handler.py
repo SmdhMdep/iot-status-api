@@ -36,7 +36,11 @@ def route_alarm_notification(event: dict, _):
         "disconnected" if notification["violationEventType"] == "in-alarm"
         else "connected"
     )
-    logger.append_keys(name=device_name, connectivity=device_connectivity)
+    logger.append_keys(alarm_details={
+        'device_name': device_name,
+        'connectivity_status': device_connectivity,
+        'event_timestamp': notification["violationEventTime"] / 1000,
+    })
 
     date = datetime.fromtimestamp(notification["violationEventTime"] / 1000)
     subject = SUBJECT_TEMPLATE.format(device_name=device_name)
@@ -52,4 +56,4 @@ def route_alarm_notification(event: dict, _):
         sns_client.publish(TopicArn=topic_arn, Subject=subject, Message=message)
         logger.info("routed alarm notification")
     except sns_client.exceptions.NotFoundException:
-        logger.info("skipping routing of alarm notification", device_name)
+        logger.info("skipping routing of alarm notification")
