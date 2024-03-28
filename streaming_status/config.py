@@ -43,6 +43,14 @@ class _Config:
         return os.environ['DEVICE_LEDGER_TABLE_REGION']
 
     @property
+    def schema_registry_table_name(self) -> str:
+        return os.environ['SCHEMA_REGISTRY_TABLE_NAME']
+
+    @property
+    def schema_registry_table_region(self) -> str:
+        return os.environ['SCHEMA_REGISTRY_TABLE_REGION']
+
+    @property
     def stream_data_bucket_name(self) -> str:
         return os.environ['STREAM_DATA_BUCKET_NAME']
 

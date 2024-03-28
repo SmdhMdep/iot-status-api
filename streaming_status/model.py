@@ -43,6 +43,7 @@ Device = TypedDict("Device", {
     "connectivity": DeviceConnectivity | None,
     "deviceInfo": NotRequired[DeviceInfo],
     "label": NotRequired[DeviceCustomLabel],
+    "dataSchema": NotRequired[str],
     # a JSONL file preview
     "streamPreview": NotRequired[str],
     "streamLastBatchTimestamp": Timestamp | None,
@@ -71,6 +72,7 @@ def entity_to_model(
     organization = ' '.join(map(str.capitalize, organization.split("-"))) if organization else None
 
     last_stream_ts = stream_preview[1] if stream_preview else None
+    data_schema = (ledger_entity or {}).get("json_schema")
     label = (ledger_entity or {}).get("customLabel")
 
     return {
@@ -83,6 +85,7 @@ def entity_to_model(
             "streamPreview": stream_preview[0],
             "lastStreamBatchTimestamp": last_stream_ts.timestamp() if last_stream_ts else None,
         } if stream_preview else {}),
+        **({"dataSchema": data_schema} if data_schema is not None and data_schema != '{}' else {}),
         **({
             'label': DeviceCustomLabel.from_value(label)
         } if ledger_entity is not None and label is not None else {}),

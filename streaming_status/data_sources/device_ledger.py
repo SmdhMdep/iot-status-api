@@ -114,7 +114,7 @@ def _scan_table(
 
 def find_device(provider: str | None, organization: str | None, device_name: str):
     key = {"serialNumber": device_name}
-    device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get("Item")
+    device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get("Item", {})
     device_provider = device_info.get("jwtGroup") # type: ignore
     device_organization = device_info.get("org") # type: ignore
 
