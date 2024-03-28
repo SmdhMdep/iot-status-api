@@ -178,7 +178,10 @@ def export_devices(provider: str | None):
 @pass_provider
 def get_device(device_name: str, provider: str | None):
     organization = get_request_organization(app)
-    return repo.get_device(provider=provider, organization=organization, device_name=device_name)
+    device = repo.get_device(provider=provider, organization=organization, device_name=device_name)
+    if device is None:
+        raise AppError.not_found('no such device')
+    return device
 
 
 def check_device_access(func):
@@ -280,6 +283,24 @@ def list_organizations():
         name_like=app.current_event.get_query_string_value("query"),
         page=get_query_integer_value(app.current_event, "page"),
     )
+
+@app.get('/schemas')
+@require_permission(Permission.devices_create)
+@pass_provider
+def list_devices_schemas(provider: str | None):
+    page = app.current_event.get_query_string_value("page")
+    return repo.list_schemas(provider=provider, page=page)
+
+
+@app.get('/schemas/<schema_id>')
+@require_permission(Permission.devices_create)
+@pass_provider
+def get_data_schema(schema_id, provider: str | None):
+    schema = repo.get_schema(provider=provider, id=schema_id)
+    if schema is None:
+        raise AppError.not_found("no such schema")
+
+    return schema
 
 
 @app.get('/me/permissions')

@@ -39,7 +39,7 @@ def list_schemas(
             },
         }
 
-    result = schemas_table.scan(IndexName="jwtGroup-title-index", **params)
+    result = schemas_table.scan(**params)
     next_page = result.get("LastEvaluatedKey")
     next_page_encoded = (
         base64.encodebytes(json.dumps(next_page).encode()).decode()

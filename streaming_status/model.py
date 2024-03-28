@@ -49,8 +49,16 @@ Device = TypedDict("Device", {
     "streamLastBatchTimestamp": Timestamp | None,
 })
 
+DeviceDataSchema = TypedDict("DeviceDataSchema", {
+    "id": str,
+    "provider": str,
+    "schema": str,
+    "title": str,
+    "version": int,
+})
 
-def entity_to_model(
+
+def device_entity_to_model(
     *,
     fleet_entity=None,
     ledger_entity=None,
@@ -89,6 +97,15 @@ def entity_to_model(
         **({
             'label': DeviceCustomLabel.from_value(label)
         } if ledger_entity is not None and label is not None else {}),
+    }
+
+def schema_entity_to_model(schema_entity) -> DeviceDataSchema:
+    return {
+        "id": schema_entity["id"],
+        "provider": schema_entity["jwtGroup"],
+        "schema": schema_entity["jsonSchema"],
+        "title": schema_entity["title"],
+        "version": int(schema_entity["version"]),
     }
 
 def _connectivity_to_model(fleet_entity=None, use_default_unprovisioned=True) -> DeviceConnectivity | None:
