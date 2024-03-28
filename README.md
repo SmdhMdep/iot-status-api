@@ -8,6 +8,8 @@ This API exposes the following endpoints:
 - /api/devices/<device_id> - get device details
 - /api/providers - for admins, list all device providers
 - /api/organizations - list all organizations
+- /api/schemas - list all devices data schemas
+- /api/schemas/<schema_id> - get schema by id
 
 ## Getting started
 

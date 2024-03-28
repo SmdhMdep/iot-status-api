@@ -2,7 +2,7 @@ import re
 from typing import TypedDict, TypeVar, Generic, NotRequired
 
 from .errors import AppError
-from .model import entity_to_model, Device, DeviceCustomLabel
+from .model import device_entity_to_model as entity_to_model, schema_entity_to_model, Device, DeviceCustomLabel
 from .utils import logger
 from .data_sources import device_ledger, fleet_index, stream_data, keycloak_api
 
@@ -152,6 +152,27 @@ def list_organizations(
         name_like=name_like, page=page or 0, page_size=page_size
     )
     return {'items': groups, 'nextPage': next_page}
+
+def list_schemas(
+    provider: str | None,
+    page: str | None = None,
+    page_size: int | None = DEFAULT_PAGE_SIZE,
+):
+    from .data_sources import schema_registry
+
+    provider = _canonicalize_group_name(provider)
+    next_page, items = schema_registry.list_schemas(provider, page, page_size)
+    return {
+        'items': [schema_entity_to_model(item) for item in items],
+        'nextPage': next_page,
+    }
+
+def get_schema(provider: str | None, id: str):
+    from .data_sources import schema_registry
+
+    provider = _canonicalize_group_name(provider)
+    schema = schema_registry.get_schema(provider, id)
+    return schema_entity_to_model(schema) if schema is not None else None
 
 def _canonicalize_group_name(group: str | None) -> str | None:
     return '-'.join(group.lower().split(' ')) if group is not None else None
