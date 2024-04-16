@@ -30,6 +30,7 @@ Device = TypedDict("Device", {
     "deviceInfo": NotRequired[DeviceInfo],
     # a JSONL file preview
     "streamPreview": NotRequired[str],
+    "streamLastBatchTimestamp": Timestamp | None,
 })
 
 
@@ -37,9 +38,9 @@ def entity_to_model(
     *,
     fleet_entity=None,
     ledger_entity=None,
-    stream_preview: str | None = None,
+    stream_preview: tuple[str, datetime | None] | None = None,
 ) -> Device:
-    assert(fleet_entity is not None or ledger_entity is not None)
+    assert fleet_entity is not None or ledger_entity is not None
 
     provider = (
         ledger_entity["jwtGroup"] if ledger_entity and "jwtGroup" in ledger_entity
@@ -47,12 +48,17 @@ def entity_to_model(
     )
     provider = ' '.join(map(str.capitalize, provider.split("-"))) if provider else None
 
+    last_stream_ts = stream_preview[1] if stream_preview else None
+
     return {
         "name": fleet_entity['thingName'] if fleet_entity else ledger_entity["serialNumber"],
         "connectivity": _connectivity_to_model(fleet_entity),
         "provider": provider,
         **({ "deviceInfo": _device_info_to_model(ledger_entity) } if ledger_entity else {}),
-        **({ "streamPreview": stream_preview } if stream_preview else {}),
+        **({
+            "streamPreview": stream_preview[0],
+            "lastStreamBatchTimestamp": last_stream_ts.timestamp() if last_stream_ts else None,
+        } if stream_preview else {}),
     }
 
 def _connectivity_to_model(fleet_entity=None) -> DeviceConnectivity:

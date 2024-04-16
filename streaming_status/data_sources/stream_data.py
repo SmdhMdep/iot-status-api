@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from io import BytesIO
 
 import boto3
@@ -21,7 +22,7 @@ def canonicalize_project_name(name: str) -> str:
     return _camel_to_kebab_case_pattern.sub('-', name).lower()
 
 
-def get_stream_preview(topic: str) -> str | None:
+def get_stream_preview(topic: str) -> tuple[str, datetime | None] | None:
     # topic name format: ($aws/?)rules/<rule_name>/<version>/<org>/<project>/<resource>
     _, _, org_name, project_name, resource_name = (
         topic.removeprefix('$aws/').removeprefix('rules/').split('/')
@@ -32,24 +33,36 @@ def get_stream_preview(topic: str) -> str | None:
     if not (package := _find_package(id=package_name)):
         return None
 
-    if not (cloud_storage_path := _find_storage_path(package, resource_name)):
+    if not (resource := _find_storage_path(package, resource_name)):
         return None
 
+    cloud_storage_path, last_modified = resource
     with BytesIO() as memory_file:
         try:
             _download_into_file(cloud_storage_path, memory_file)
             return '\n'.join(
                 line.decode() for _, line in zip(range(_PREVIEW_MAX_LINES), memory_file)
-            )
+            ), last_modified
         except (ValueError, IOError, ClientError):
             logger.exception('unable to read file content for path: %s', cloud_storage_path)
             raise AppError.internal_error('service not available')
 
-def _find_storage_path(package: dict, name: str) -> str | None:
+
+def _find_storage_path(package: dict, name: str) -> tuple[str, datetime | None] | None:
     for resource in package['resources']:
         if resource['name'] == name:
-            return resource['cloud_storage_key'] if 'cloud_storage_key' in resource else None
+            try:
+                last_modified = datetime.fromisoformat(resource['last_modified'])
+            except ValueError:
+                last_modified = None
+
+            logger.info("last modified value: %s", last_modified)
+            return (
+                resource['cloud_storage_key'], last_modified
+                if 'cloud_storage_key' in resource else None
+            )
     return None
+
 
 def _find_package(id: str):
     response = requests.get(

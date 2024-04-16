@@ -94,7 +94,7 @@ def get_device(provider: str | None, device_name: str, brief_repr: bool = False)
         if e.status_code != AppError.INTERNAL_ERROR_CODE:
             raise
         logger.exception("(suppressed) error fetching stream preview")
-        preview = "<error fetching preview>"
+        preview = "<error fetching preview>", None
 
     return entity_to_model(fleet_entity=fleet_device, ledger_entity=ledger_device, stream_preview=preview)
 
