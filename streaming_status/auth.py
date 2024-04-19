@@ -10,8 +10,50 @@ from .utils import AppError
 class Role(StrEnum):
     admin = 'admin'
     installer = 'installer'
+    external_installer = 'external-installer'
     data_scientist = 'data-scientist'
     organization_member = 'org-member'
+
+
+class Permission(StrEnum):
+    providersList = 'providers:list'
+    organizationsList = 'organizations:list'
+    devicesRegister = 'devices:register'
+
+    @staticmethod
+    def merge_inplace(into: dict['Permission', bool], from_: dict['Permission', bool]):
+        for permission in from_:
+            into[permission] = into.get(permission, False) or from_[permission]
+        return into
+
+
+_role_permissions = {
+    Role.admin.value: {
+        Permission.providersList: True,
+        Permission.organizationsList: True,
+        Permission.devicesRegister: True,
+    },
+    Role.installer.value: {
+        Permission.providersList: False,
+        Permission.organizationsList: True,
+        Permission.devicesRegister: True,
+    },
+    Role.external_installer.value: {
+        Permission.providersList: False,
+        Permission.organizationsList: False,
+        Permission.devicesRegister: True,
+    },
+    Role.data_scientist.value: {
+        Permission.providersList: True,
+        Permission.organizationsList: True,
+        Permission.devicesRegister: False,
+    },
+    Role.organization_member.value: {
+        Permission.providersList: False,
+        Permission.organizationsList: False,
+        Permission.devicesRegister: False,
+    },
+}
 
 
 class Auth:
@@ -35,6 +77,21 @@ class Auth:
                 .get(config.oidc_client_id, {})
                 .get('roles', [])
         )
+
+    def get_permissions(self) -> dict[Permission, bool]:
+        permissions: dict[Permission, bool]
+        roles = self._roles()
+
+        # special case for external installers as they have the installer role as well
+        # but we don't want them to be able to list organizations/installers
+        if Role.external_installer in roles and Role.installer in roles:
+            permissions = _role_permissions[Role.external_installer]
+        else:
+            permissions = {}
+            for ps in (_role_permissions[r] for r in roles):
+                Permission.merge_inplace(permissions, ps)
+
+        return permissions
 
     def has_role(self, *roles: Role) -> bool:
         user_roles = self._roles()

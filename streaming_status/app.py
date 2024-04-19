@@ -6,7 +6,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConf
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 from . import repo
-from .auth import Auth, Role
+from .auth import Auth, Role, Permission
 from .config import config
 from .errors import AppError
 from .utils import logger, get_query_integer_value, parse_date_range_or_default
@@ -135,6 +135,27 @@ def require_role(roles: list[Role]):
     return decorator
 
 
+def require_permission(permission: Permission):
+    """Guard a route with a required permission.
+
+    The current user must have the required `permission` to access the route.
+    No-op in offline mode.
+    """
+    def decorator(func):
+        if config.is_offline:
+            return func
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            permissions = get_auth(app).get_permissions()
+            if permissions[permission]:
+                return func(*args, **kwargs)
+            raise AppError.unauthorized()
+
+        return wrapper
+    return decorator
+
+
 @app.get('/devices')
 @pass_provider
 def list_devices(provider: str | None):
@@ -246,7 +267,7 @@ def post_device_alarms_unsubscribe(device_name: str):
 
 
 @app.get('/providers')
-@require_role([Role.admin, Role.data_scientist])
+@require_permission(Permission.providersList)
 def list_providers():
     query, page = (
         app.current_event.get_query_string_value("query"),
@@ -257,12 +278,18 @@ def list_providers():
 
 
 @app.get('/organizations')
-@require_role([Role.admin, Role.data_scientist, Role.installer])
+@require_permission(Permission.organizationsList)
 def list_organizations():
     return repo.list_organizations(
         name_like=app.current_event.get_query_string_value("query"),
         page=get_query_integer_value(app.current_event, "page"),
     )
+
+
+@app.get('/me/permissions')
+def me_permissions():
+    auth = get_auth(app)
+    return auth.get_permissions()
 
 
 @logger.inject_lambda_context(correlation_id_path=API_GATEWAY_HTTP)

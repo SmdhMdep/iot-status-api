@@ -1,7 +1,8 @@
 # SMDH IoT Hub Devices Status API
 
-This API exposes three endpoints:
+This API exposes the following endpoints:
 
+- /api/me/permissions - list the permissions for the current user
 - /api/devices - list all devices for the provider
 - /api/devices/export - export a list of all devices into csv or json
 - /api/devices/<device_id> - get device details
