@@ -6,7 +6,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConf
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 from . import repo
-from .auth import Auth, Role, Permission
+from .auth import Auth, Permission
 from .config import config
 from .errors import AppError
 from .utils import logger, get_query_integer_value, parse_date_range_or_default
@@ -51,7 +51,7 @@ def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
     auth = get_auth(app)
     requested_provider = app.current_event.get_query_string_value('provider')
 
-    if auth.has_role(Role.admin, Role.data_scientist):
+    if auth.has_permission(Permission.providers_read):
         provider = requested_provider
     else:
         groups = auth.group_memberships()
@@ -71,9 +71,7 @@ def get_request_organization(app: APIGatewayHttpResolver) -> str | None:
     auth = get_auth(app)
     requested_organization = app.current_event.get_query_string_value('organization')
 
-    if (
-        auth.has_role(Role.admin, Role.data_scientist, Role.installer)
-    ):
+    if auth.has_permission(Permission.organizations_read):
         organization = requested_organization
     else:
         groups = auth.group_memberships()
@@ -114,27 +112,6 @@ def pass_provider(route):
     return wrapper
 
 
-def require_role(roles: list[Role]):
-    """Guard a route with a required role.
-
-    The current user must be assigned one of the `roles` to access the route.
-    No-op in offline mode.
-    """
-    def decorator(func):
-        if config.is_offline:
-            return func
-
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            auth = get_auth(app)
-            if any(auth.has_role(role) for role in roles):
-                return func(*args, **kwargs)
-            raise AppError.unauthorized()
-
-        return wrapper
-    return decorator
-
-
 def require_permission(permission: Permission):
     """Guard a route with a required permission.
 
@@ -147,8 +124,7 @@ def require_permission(permission: Permission):
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            permissions = get_auth(app).get_permissions()
-            if permissions[permission]:
+            if get_auth(app).has_permission(permission):
                 return func(*args, **kwargs)
             raise AppError.unauthorized()
 
@@ -170,6 +146,7 @@ def list_devices(provider: str | None):
 @app.get('/devices/export')
 @pass_provider
 def export_devices(provider: str | None):
+    organization = get_request_organization(app)
     requested_format, compress = (
         app.current_event.get_query_string_value("format", "csv"),
         app.current_event.get_query_string_value("compress", "1") == "1",
@@ -183,7 +160,7 @@ def export_devices(provider: str | None):
         raise AppError.invalid_argument(f"expected format to be 'csv' or 'json' got '{requested_format}'")
 
     filename = f"devices_export.{requested_format}"
-    body = serialize(repo.export_devices(provider=provider))
+    body = serialize(repo.export_devices(provider=provider, organization=organization))
 
     return Response(
         status_code=200,
@@ -197,7 +174,8 @@ def export_devices(provider: str | None):
 @app.get('/devices/<device_name>')
 @pass_provider
 def get_device(device_name: str, provider: str | None):
-    return repo.get_device(provider=provider, device_name=device_name)
+    organization = get_request_organization(app)
+    return repo.get_device(provider=provider, organization=organization, device_name=device_name)
 
 
 def check_device_access(func):
@@ -205,10 +183,11 @@ def check_device_access(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         provider = get_request_provider(app)
-        if provider is not None:
+        organization = get_request_organization(app)
+        if provider is not None or organization is not None:
             # make sure the provider has access to this device
             device_name = kwargs['device_name']
-            _ = repo.get_device(provider, device_name, brief_repr=True)
+            _ = repo.get_device(provider, organization, device_name, brief_repr=True)
 
         return func(*args, **kwargs)
 
@@ -267,7 +246,7 @@ def post_device_alarms_unsubscribe(device_name: str):
 
 
 @app.get('/providers')
-@require_permission(Permission.providersList)
+@require_permission(Permission.providers_read)
 def list_providers():
     query, page = (
         app.current_event.get_query_string_value("query"),
@@ -278,7 +257,7 @@ def list_providers():
 
 
 @app.get('/organizations')
-@require_permission(Permission.organizationsList)
+@require_permission(Permission.organizations_read)
 def list_organizations():
     return repo.list_organizations(
         name_like=app.current_event.get_query_string_value("query"),

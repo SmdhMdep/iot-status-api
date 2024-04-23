@@ -68,24 +68,31 @@ def list_devices(
         next_page=next_page,
     )
 
-def export_devices(provider: str | None) -> list[Device]:
+def export_devices(provider: str | None, organization: str | None) -> list[Device]:
     provider = _canonicalize_group_name(provider)
-    _, fleet_items = fleet_index.list_devices(provider=provider)
-    _, ledger_items = device_ledger.list_devices(provider=provider)
+    organization = _canonicalize_group_name(organization)
+    _, fleet_items = fleet_index.list_devices(provider=provider, organization=organization)
+    _, ledger_items = device_ledger.list_devices(provider=provider, organization=organization)
     return _merge_entities_to_models(fleet_items, ledger_items)
 
-def get_device(provider: str | None, device_name: str, brief_repr: bool = False) -> Device:
+def get_device(
+    provider: str | None,
+    organization: str | None,
+    device_name: str,
+    brief_repr: bool = False,
+) -> Device:
     provider = _canonicalize_group_name(provider)
+    organization = _canonicalize_group_name(organization)
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
 
-    ledger_device = device_ledger.find_device(provider, device_name)
+    ledger_device = device_ledger.find_device(provider, organization, device_name)
     if not ledger_device:
         raise AppError.not_found(f'device with name {device_name} is not registered')
     if brief_repr:
         return entity_to_model(ledger_entity=ledger_device)
 
-    fleet_device = fleet_index.find_device(provider, device_name)
+    fleet_device = fleet_index.find_device(provider, organization, device_name)
 
     try:
         topic = _get_streaming_topic(ledger_device)
@@ -118,8 +125,8 @@ def list_organizations(
     )
     return {'items': groups, 'nextPage': next_page}
 
-def _canonicalize_group_name(provider: str | None) -> str | None:
-    return '-'.join(provider.lower().split(' ')) if provider is not None else None
+def _canonicalize_group_name(group: str | None) -> str | None:
+    return '-'.join(group.lower().split(' ')) if group is not None else None
 
 def _load_page(page: str | None) -> tuple[LedgerPage, FleetPage]:
     if not page:

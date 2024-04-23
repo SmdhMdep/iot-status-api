@@ -16,9 +16,9 @@ class Role(StrEnum):
 
 
 class Permission(StrEnum):
-    providersList = 'providers:list'
-    organizationsList = 'organizations:list'
-    devicesRegister = 'devices:register'
+    providers_read = 'providers:read'
+    organizations_read = 'organizations:read'
+    devices_create = 'devices:create'
 
     @staticmethod
     def merge_inplace(into: dict['Permission', bool], from_: dict['Permission', bool]):
@@ -29,29 +29,29 @@ class Permission(StrEnum):
 
 _role_permissions = {
     Role.admin.value: {
-        Permission.providersList: True,
-        Permission.organizationsList: True,
-        Permission.devicesRegister: True,
+        Permission.providers_read: True,
+        Permission.organizations_read: True,
+        Permission.devices_create: True,
     },
     Role.installer.value: {
-        Permission.providersList: False,
-        Permission.organizationsList: True,
-        Permission.devicesRegister: True,
+        Permission.providers_read: False,
+        Permission.organizations_read: True,
+        Permission.devices_create: True,
     },
     Role.external_installer.value: {
-        Permission.providersList: False,
-        Permission.organizationsList: False,
-        Permission.devicesRegister: True,
+        Permission.providers_read: False,
+        Permission.organizations_read: False,
+        Permission.devices_create: True,
     },
     Role.data_scientist.value: {
-        Permission.providersList: True,
-        Permission.organizationsList: True,
-        Permission.devicesRegister: False,
+        Permission.providers_read: True,
+        Permission.organizations_read: True,
+        Permission.devices_create: False,
     },
     Role.organization_member.value: {
-        Permission.providersList: False,
-        Permission.organizationsList: False,
-        Permission.devicesRegister: False,
+        Permission.providers_read: False,
+        Permission.organizations_read: False,
+        Permission.devices_create: False,
     },
 }
 
@@ -78,6 +78,10 @@ class Auth:
                 .get('roles', [])
         )
 
+    def has_permission(self, *permissions: Permission) -> bool:
+        current_permissions = self.get_permissions()
+        return all(current_permissions[permission] for permission in permissions)
+
     def get_permissions(self) -> dict[Permission, bool]:
         permissions: dict[Permission, bool]
         roles = self._roles()
@@ -92,10 +96,6 @@ class Auth:
                 Permission.merge_inplace(permissions, ps)
 
         return permissions
-
-    def has_role(self, *roles: Role) -> bool:
-        user_roles = self._roles()
-        return any(role in user_roles for role in roles)
 
     def _introspect_token(self) -> dict:
         self._introspected_token = (

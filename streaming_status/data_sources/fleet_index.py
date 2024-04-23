@@ -52,13 +52,17 @@ def list_devices(
 
     return fleet_result.get('nextToken'), fleet_result.get("things") or []
 
-def find_device(provider: str | None, device_name: str):
+def find_device(provider: str | None, organization: str | None, device_name: str):
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
+    if (provider is not None and '"' in provider) or (organization is not None and '"' in organization):
+        raise AppError.invalid_argument("provider and organization must not contain double quotes")
 
     query = f'thingName:"{device_name}"'
     if provider is not None:
-        query = f'{query} AND attributes.SensorProvider:"{provider}"'
+        query = f'{query} AND attributes.{SENSOR_PROVIDER}:"{provider}"'
+    if organization is not None:
+        query = f'{query} AND attributes.{SENSOR_ORGANIZATION}:"{organization}"'
 
     result = iot_client.search_index(maxResults=1, queryString=query)
     if not result['things']:

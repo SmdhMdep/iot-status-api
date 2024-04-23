@@ -91,13 +91,17 @@ def _scan_table(
     return next_page, items
 
 
-def find_device(provider: str | None, device_name: str):
+def find_device(provider: str | None, organization: str | None, device_name: str):
     key = {"serialNumber": device_name}
     device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get("Item")
     device_provider = device_info.get("jwtGroup") # type: ignore
+    device_organization = device_info.get("org") # type: ignore
 
     return (
         device_info
-        if not provider or not device_provider or device_provider == provider
+        if (
+            (not provider or not device_provider or device_provider == provider)
+            and (not organization or not device_organization or device_organization == organization)
+        )
         else None
     )
