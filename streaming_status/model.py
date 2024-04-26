@@ -40,6 +40,7 @@ class DeviceCustomLabel(StrEnum):
 Device = TypedDict("Device", {
     "name": str,
     "provider": str | None,
+    "organization": str | None,
     "connectivity": DeviceConnectivity | None,
     "deviceInfo": NotRequired[DeviceInfo],
     "label": NotRequired[DeviceCustomLabel],
@@ -57,12 +58,18 @@ def entity_to_model(
     ledger_entity_unprovisioned: bool = True,
 ) -> Device:
     assert fleet_entity is not None or ledger_entity is not None
+    fleet_entity_attrs = (fleet_entity or {}).get("attributes", {})
 
     provider = (
         ledger_entity["jwtGroup"] if ledger_entity and "jwtGroup" in ledger_entity
-        else (fleet_entity or {}).get("attributes", {}).get(ThingAttributeNames.SENSOR_PROVIDER)
+        else fleet_entity_attrs.get(ThingAttributeNames.SENSOR_PROVIDER)
     )
     provider = ' '.join(map(str.capitalize, provider.split("-"))) if provider else None
+    organization = (
+        ledger_entity['org'] if ledger_entity
+        else fleet_entity_attrs.get(ThingAttributeNames.SENSOR_ORGANIZATION)
+    )
+    organization = ' '.join(map(str.capitalize, organization.split("-"))) if organization else None
 
     last_stream_ts = stream_preview[1] if stream_preview else None
     label = (ledger_entity or {}).get("customLabel")
@@ -71,6 +78,7 @@ def entity_to_model(
         "name": fleet_entity['thingName'] if fleet_entity else ledger_entity["serialNumber"],
         "connectivity": _connectivity_to_model(fleet_entity, use_default_unprovisioned=ledger_entity_unprovisioned),
         "provider": provider,
+        "organization": organization,
         **({ "deviceInfo": _device_info_to_model(ledger_entity) } if ledger_entity else {}),
         **({
             "streamPreview": stream_preview[0],
