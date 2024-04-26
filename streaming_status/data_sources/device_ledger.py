@@ -5,6 +5,7 @@ import boto3
 
 from ..errors import AppError
 from ..config import config
+from ..model import DeviceCustomLabel
 
 
 dynamodb = boto3.resource("dynamodb", region_name=config.device_ledger_table_region)
@@ -15,6 +16,7 @@ def list_devices(
     *,
     organization: str | None = None,
     name_like: str | None = None,
+    label: DeviceCustomLabel | None = None,
     page: str | None = None,
     page_size: int | None = None,
     unprovisioned_only: bool = False,
@@ -28,7 +30,11 @@ def list_devices(
         raise AppError.invalid_argument("invalid page key")
 
     scan_params = _build_scan_params(
-        provider, organization=organization, name_like=name_like, unprovisioned_only=unprovisioned_only
+        provider,
+        organization=organization,
+        name_like=name_like,
+        label=label,
+        unprovisioned_only=unprovisioned_only,
     )
     next_page, items = _scan_table(scan_params, page=decoded_page, page_size=page_size)
 
@@ -43,6 +49,7 @@ def _build_scan_params(
     *,
     organization: str | None,
     name_like: str | None,
+    label: DeviceCustomLabel | None,
     unprovisioned_only: bool,
 ) -> dict:
     scan_filter: dict = {}
@@ -59,7 +66,12 @@ def _build_scan_params(
     if name_like:
         scan_filter["serialNumber"] = {
             "ComparisonOperator": "BEGINS_WITH",
-            "AttributeValueList": [name_like]
+            "AttributeValueList": [name_like],
+        }
+    if label:
+        scan_filter["customLabel"] = {
+            "ComparisonOperator": "EQ",
+            "AttributeValueList": [label.value],
         }
     if unprovisioned_only:
         scan_filter["provStatus"] = {"ComparisonOperator": "NULL"}
@@ -104,4 +116,30 @@ def find_device(provider: str | None, organization: str | None, device_name: str
             and (not organization or not device_organization or device_organization == organization)
         )
         else None
+    )
+
+
+def update_device_label(provider: str | None = None, organization: str | None = None, *, device_name: str, label: DeviceCustomLabel):
+    conditions = []
+    additional_attribute_values = {}
+    if provider is not None:
+        conditions.append("jwtGroup=:provider")
+        additional_attribute_values[":provider"] = provider
+    if organization is not None:
+        conditions.append("org=:organization")
+        additional_attribute_values[":organization"] = organization
+
+    if conditions:
+        kwargs = {"ConditionExpression": " AND ".join(conditions)}
+    else:
+        kwargs = {}
+
+    dynamodb.Table(config.device_ledger_table_name).update_item(
+        Key={"serialNumber": device_name},
+        UpdateExpression="SET customLabel=:customLabel",
+        ExpressionAttributeValues={
+            ":customLabel": label.value,
+            **additional_attribute_values,
+        },
+        **kwargs, # type: ignore
     )

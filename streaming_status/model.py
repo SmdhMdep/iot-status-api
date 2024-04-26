@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import TypedDict, NotRequired
+from enum import StrEnum
 
-from .data_sources import fleet_index
+from .data_sources.constants import ThingAttributeNames, DISCONNECT_REASON_DESCRIPTIONS
 
 
 Timestamp = float
@@ -23,11 +24,25 @@ DeviceInfo = TypedDict("DeviceInfo", {
     "registrationTimestamp": Timestamp | None,
 })
 
+
+class DeviceCustomLabel(StrEnum):
+    none = 'NONE'
+    deployed = 'DEPLOYED'
+    undeployed = 'UNDEPLOYED'
+    periodic_batch = 'PERIODIC_BATCH'
+    deactivated = 'DEACTIVATED'
+
+    @classmethod
+    def from_value(cls, value: str):
+        return next((status for status in cls if status.value == value), None)
+
+
 Device = TypedDict("Device", {
     "name": str,
     "provider": str | None,
-    "connectivity": DeviceConnectivity,
+    "connectivity": DeviceConnectivity | None,
     "deviceInfo": NotRequired[DeviceInfo],
+    "label": NotRequired[DeviceCustomLabel],
     # a JSONL file preview
     "streamPreview": NotRequired[str],
     "streamLastBatchTimestamp": Timestamp | None,
@@ -39,36 +54,41 @@ def entity_to_model(
     fleet_entity=None,
     ledger_entity=None,
     stream_preview: tuple[str, datetime | None] | None = None,
+    ledger_entity_unprovisioned: bool = True,
 ) -> Device:
     assert fleet_entity is not None or ledger_entity is not None
 
     provider = (
         ledger_entity["jwtGroup"] if ledger_entity and "jwtGroup" in ledger_entity
-        else (fleet_entity or {}).get("attributes", {}).get(fleet_index.SENSOR_PROVIDER)
+        else (fleet_entity or {}).get("attributes", {}).get(ThingAttributeNames.SENSOR_PROVIDER)
     )
     provider = ' '.join(map(str.capitalize, provider.split("-"))) if provider else None
 
     last_stream_ts = stream_preview[1] if stream_preview else None
+    label = (ledger_entity or {}).get("customLabel")
 
     return {
         "name": fleet_entity['thingName'] if fleet_entity else ledger_entity["serialNumber"],
-        "connectivity": _connectivity_to_model(fleet_entity),
+        "connectivity": _connectivity_to_model(fleet_entity, use_default_unprovisioned=ledger_entity_unprovisioned),
         "provider": provider,
         **({ "deviceInfo": _device_info_to_model(ledger_entity) } if ledger_entity else {}),
         **({
             "streamPreview": stream_preview[0],
             "lastStreamBatchTimestamp": last_stream_ts.timestamp() if last_stream_ts else None,
         } if stream_preview else {}),
+        **({
+            'label': DeviceCustomLabel.from_value(label) if label is not None else DeviceCustomLabel.none
+        } if ledger_entity is not None else {}),
     }
 
-def _connectivity_to_model(fleet_entity=None) -> DeviceConnectivity:
+def _connectivity_to_model(fleet_entity=None, use_default_unprovisioned=True) -> DeviceConnectivity | None:
     connectivity = fleet_entity['connectivity'] if fleet_entity else None
     return {
         'connected': connectivity['connected'],
         'timestamp': timestamp / 1000.0 if (timestamp := connectivity['timestamp']) > 0 else None,
         'disconnectReason': (disconnect_reason := connectivity.get('disconnectReason')),
         'disconnectReasonDescription': (
-            fleet_index.DISCONNECT_REASON_DESCRIPTIONS[disconnect_reason]
+            DISCONNECT_REASON_DESCRIPTIONS[disconnect_reason]
             if disconnect_reason is not None else None
         ),
     } if connectivity else {
@@ -76,7 +96,7 @@ def _connectivity_to_model(fleet_entity=None) -> DeviceConnectivity:
         "timestamp": None,
         "disconnectReason": "NOT_PROVISIONED", # custom reason
         "disconnectReasonDescription": "The client has not been provisioned yet.",
-    }
+    } if use_default_unprovisioned else None
 
 def _device_info_to_model(ledger_entity) -> DeviceInfo:
     return {

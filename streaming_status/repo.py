@@ -3,7 +3,7 @@ from typing import TypedDict, TypeVar, Generic, NotRequired
 
 from .auth import Auth
 from .errors import AppError
-from .model import entity_to_model, Device
+from .model import entity_to_model, Device, DeviceCustomLabel
 from .utils import logger
 from .data_sources import device_ledger, fleet_index, stream_data, keycloak_api
 
@@ -28,6 +28,7 @@ def list_devices(
     provider: str | None,
     organization: str | None,
     name_like: str | None = None,
+    label: DeviceCustomLabel | None = None,
     page: str | None = None,
     page_size: int | None = DEFAULT_PAGE_SIZE,
 ) -> PaginatedResult[str, Device]:
@@ -35,22 +36,24 @@ def list_devices(
     organization = _canonicalize_group_name(organization)
     ledger_page, fleet_page = _load_page(page)
     ledger_items, fleet_items, next_page = [], [], None # type: ignore
+    query_ledger_only = label is not None
 
     is_first_page = not ledger_page and not fleet_page
-    if ledger_page or is_first_page:
+    if query_ledger_only or ledger_page or is_first_page:
         next_page, ledger_items = device_ledger.list_devices(
             provider,
             organization=organization,
             name_like=name_like,
+            label=label,
             page=ledger_page,
             page_size=page_size,
-            unprovisioned_only=True,
+            unprovisioned_only=not query_ledger_only,
         )
         if next_page:
             next_page = _dump_page(LedgerPage, next_page)
 
     is_partial_page = not next_page and (page_size is None or len(ledger_items) < page_size)
-    if fleet_page or is_partial_page:
+    if not query_ledger_only and (fleet_page or is_partial_page):
         cont_page_size = page_size - len(ledger_items) if page_size is not None else None
         next_page, fleet_items = fleet_index.list_devices(
             provider,
@@ -66,6 +69,7 @@ def list_devices(
         ledger_items=ledger_items,
         fleet_items=fleet_items,
         next_page=next_page,
+        ledger_items_unprovisioned=not query_ledger_only,
     )
 
 def export_devices(provider: str | None, organization: str | None) -> list[Device]:
@@ -104,6 +108,9 @@ def get_device(
         preview = "<error fetching preview>", None
 
     return entity_to_model(fleet_entity=fleet_device, ledger_entity=ledger_device, stream_preview=preview)
+
+def update_device_label(device_name: str, label: DeviceCustomLabel):
+    device_ledger.update_device_label(device_name=device_name, label=label)
 
 def list_providers(
     name_like: str | None = None,
@@ -160,6 +167,7 @@ def _search_result_to_model(
     ledger_items: list[dict],
     fleet_items: list[dict],
     next_page: str | None,
+    ledger_items_unprovisioned: bool,
 ) -> PaginatedResult[str, Device]:
     """Create a search result based on items from both data sources.
 
@@ -168,8 +176,13 @@ def _search_result_to_model(
     return {
         'nextPage': next_page,
         'items': [
-            *(entity_to_model(ledger_entity=entity) for entity in ledger_items),
-            *(entity_to_model(fleet_entity=entity) for entity in fleet_items),
+            *(entity_to_model(
+                ledger_entity=entity,
+                ledger_entity_unprovisioned=ledger_items_unprovisioned,
+            ) for entity in ledger_items),
+            *(entity_to_model(
+                fleet_entity=entity,
+            ) for entity in fleet_items),
         ]
     }
 
@@ -179,10 +192,14 @@ def _merge_entities_to_models(fleet_items, ledger_items) -> list[Device]:
     Assumes `ledger_items` is a superset of `fleet_items`.
     """
     lookup = {fleet_entity['thingName']: fleet_entity for fleet_entity in fleet_items}
-    return [
-        entity_to_model(
-            fleet_entity=lookup.get(ledger_entity['serialNumber']),
+
+    result = []
+    for ledger_entity in ledger_items:
+        fleet_entity = lookup.get(ledger_entity['serialNumber'])
+        result.append(entity_to_model(
+            fleet_entity=fleet_entity,
             ledger_entity=ledger_entity,
-        )
-        for ledger_entity in ledger_items
-    ]
+            ledger_entity_unprovisioned=fleet_entity is None,
+        ))
+
+    return result

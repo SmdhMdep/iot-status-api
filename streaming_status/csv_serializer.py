@@ -18,6 +18,7 @@ DEVICE_DTO_KEYS = [
     "deviceInfo.provisioningTimestamp",
     "deviceInfo.registrationStatus",
     "deviceInfo.registrationTimestamp",
+    "label",
 ]
 
 

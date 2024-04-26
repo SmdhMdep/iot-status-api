@@ -2,6 +2,7 @@ from aws_lambda_powertools import Logger
 from aws_lambda_powertools.event_handler.api_gateway import BaseProxyEvent
 
 from .errors import AppError
+from .model import DeviceCustomLabel
 
 
 logger = Logger()
@@ -34,3 +35,14 @@ def parse_date_range_or_default(range_value):
         end_date = current_date
 
     return (start_date, end_date)
+
+
+def parse_device_custom_label(raw_label: str | None) -> DeviceCustomLabel:
+    label = None
+    if isinstance(raw_label, str):
+        label = DeviceCustomLabel.from_value(raw_label)
+    if label is None:
+        names = [label.value for label in DeviceCustomLabel]
+        raise AppError.invalid_argument(f'label must be one of: {", ".join(names)}')
+
+    return label

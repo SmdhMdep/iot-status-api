@@ -9,7 +9,7 @@ from . import repo
 from .auth import Auth, Permission
 from .config import config
 from .errors import AppError
-from .utils import logger, get_query_integer_value, parse_date_range_or_default
+from .utils import logger, get_query_integer_value, parse_date_range_or_default, parse_device_custom_label
 
 
 cors = CORSConfig(allow_origin=config.cors_allowed_origin, max_age=300, allow_credentials=True)
@@ -135,12 +135,15 @@ def require_permission(permission: Permission):
 @app.get('/devices')
 @pass_provider
 def list_devices(provider: str | None):
-    query, organization, page = (
-        app.current_event.get_query_string_value("query"),
+    organization, raw_label, query, page = (
         get_request_organization(app),
+        app.current_event.get_query_string_value("label"),
+        app.current_event.get_query_string_value("query"),
         app.current_event.get_query_string_value("page"),
     )
-    return repo.list_devices(provider=provider, organization=organization, name_like=query, page=page)
+
+    label = parse_device_custom_label(raw_label) if raw_label else None
+    return repo.list_devices(provider=provider, organization=organization, name_like=query, label=label, page=page)
 
 
 @app.get('/devices/export')
@@ -184,14 +187,28 @@ def check_device_access(func):
     def wrapper(*args, **kwargs):
         provider = get_request_provider(app)
         organization = get_request_organization(app)
-        if provider is not None or organization is not None:
-            # make sure the provider has access to this device
-            device_name = kwargs['device_name']
-            _ = repo.get_device(provider, organization, device_name, brief_repr=True)
-
+        device_name = kwargs['device_name']
+        # make sure the provider/organization has access to this device
+        _ = repo.get_device(provider, organization, device_name, brief_repr=True)
         return func(*args, **kwargs)
 
     return wrapper
+
+
+@app.put('/devices/<device_name>')
+@check_device_access
+@require_permission(Permission.device_update)
+def update_device(device_name: str):
+    body = app.current_event.json_body
+    if not isinstance(body, dict):
+        raise AppError.invalid_argument('body must be a json object with a label')
+
+    raw_label = body.get('label')
+    label = parse_device_custom_label(raw_label)
+
+    repo.update_device_label(device_name, label)
+
+    return Response(status_code=204)
 
 
 @app.get('/devices/<device_name>/monitoring/activity')

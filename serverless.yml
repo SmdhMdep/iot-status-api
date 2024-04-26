@@ -68,6 +68,11 @@ provider:
             - ${self:custom.dotenv.DEVICES_ALARMS_SRC_SNS_TOPIC_ARN}
             - ${self:custom.dotenv.DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX}*
             - !Sub arn:aws:dynamodb:${self:custom.dotenv.DEVICE_ALARMS_TABLE_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.DEVICE_ALARMS_TABLE_NAME}
+        - Effect: Allow
+          Action:
+            - dynamodb:UpdateItem
+          Resource:
+            - !Sub arn:aws:dynamodb:${self:custom.dotenv.DEVICE_LEDGER_TABLE_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.DEVICE_LEDGER_TABLE_NAME}
 
 package:
   individually: true

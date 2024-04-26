@@ -38,7 +38,7 @@ def get_activity_metric(device_name: str, date_range: tuple[datetime, datetime])
             {
                 "Id": "publish",
                 "MetricStat": {
-                    "Metric": _metric_identity("PublishIn.Success", device_name),
+                    "Metric": _metric_identity("PublishIn.Success", device_name), # type: ignore
                     # data is available for 15 days
                     "Period": 60,
                     "Stat": "SampleCount",

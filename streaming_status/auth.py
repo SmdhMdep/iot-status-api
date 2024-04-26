@@ -19,6 +19,7 @@ class Permission(StrEnum):
     providers_read = 'providers:read'
     organizations_read = 'organizations:read'
     devices_create = 'devices:create'
+    device_update = 'device:update'
 
     @staticmethod
     def merge_inplace(into: dict['Permission', bool], from_: dict['Permission', bool]):
@@ -32,26 +33,31 @@ _role_permissions = {
         Permission.providers_read: True,
         Permission.organizations_read: True,
         Permission.devices_create: True,
+        Permission.device_update: True,
     },
     Role.installer.value: {
         Permission.providers_read: False,
         Permission.organizations_read: True,
         Permission.devices_create: True,
+        Permission.device_update: True,
     },
     Role.external_installer.value: {
         Permission.providers_read: False,
         Permission.organizations_read: False,
         Permission.devices_create: True,
+        Permission.device_update: True,
     },
     Role.data_scientist.value: {
         Permission.providers_read: True,
         Permission.organizations_read: True,
         Permission.devices_create: False,
+        Permission.device_update: False,
     },
     Role.organization_member.value: {
         Permission.providers_read: False,
         Permission.organizations_read: False,
         Permission.devices_create: False,
+        Permission.device_update: False,
     },
 }
 
