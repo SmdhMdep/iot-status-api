@@ -7,9 +7,12 @@ from ..config import config
 from ..utils import logger
 from .constants import ThingAttributeNames
 
+
 device_name_regex = re.compile(r'[a-zA-Z0-9:_-]+')
 
 iot_client = boto3.client("iot", region_name=config.fleet_index_iot_region_name)
+
+DEACTIVATED_THINGS_GROUP_NAME = 'deactivated'
 
 
 def list_devices(
@@ -18,7 +21,8 @@ def list_devices(
     organization: str | None = None,
     name_like: str | None = None,
     page: str | None = None,
-    page_size: int | None = None
+    page_size: int | None = None,
+    active_only: bool = True,
 ):
     query = f'attributes.{ThingAttributeNames.REGISTRATION_WAY}:*'
 
@@ -36,6 +40,9 @@ def list_devices(
         name_like_attr = name_like.replace(":", "\:")
         query = f'{query} AND thingName:{name_like_attr}*'
 
+    if active_only:
+        query = f'{query} AND NOT thingGroupNames:{DEACTIVATED_THINGS_GROUP_NAME}'
+
     request_params: dict = {}
     if page is not None:
         request_params['nextToken'] = page
@@ -46,6 +53,7 @@ def list_devices(
     fleet_result = iot_client.search_index(queryString=query, **request_params)
 
     return fleet_result.get('nextToken'), fleet_result.get("things") or []
+
 
 def find_device(provider: str | None, organization: str | None, device_name: str):
     if not device_name_regex.fullmatch(device_name):
@@ -64,3 +72,16 @@ def find_device(provider: str | None, organization: str | None, device_name: str
         return None
 
     return result['things'][0]
+
+
+def update_device_active_state(device_name: str, active: bool):
+    if not active:
+        iot_client.add_thing_to_thing_group(
+            thingGroupName=DEACTIVATED_THINGS_GROUP_NAME,
+            thingName=device_name,
+        )
+    else:
+        iot_client.remove_thing_from_thing_group(
+            thingGroupName=DEACTIVATED_THINGS_GROUP_NAME,
+            thingName=device_name,
+        )

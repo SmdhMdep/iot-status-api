@@ -1,7 +1,6 @@
 import re
 from typing import TypedDict, TypeVar, Generic, NotRequired
 
-from .auth import Auth
 from .errors import AppError
 from .model import entity_to_model, Device, DeviceCustomLabel
 from .utils import logger
@@ -61,6 +60,7 @@ def list_devices(
             name_like=name_like,
             page=fleet_page,
             page_size=cont_page_size,
+            active_only=True,
         )
         if next_page:
             next_page = _dump_page(FleetPage, next_page)
@@ -109,8 +109,29 @@ def get_device(
 
     return entity_to_model(fleet_entity=fleet_device, ledger_entity=ledger_device, stream_preview=preview)
 
-def update_device_label(device_name: str, label: DeviceCustomLabel):
-    device_ledger.update_device_label(device_name=device_name, label=label)
+def update_device_label(device_name: str, label: DeviceCustomLabel | None):
+    item = device_ledger.find_device(provider=None, organization=None, device_name=device_name)
+    if item is None:
+        raise AppError.not_found('no such device')
+
+    old_label_value = item.get('customLabel') # type: str
+    old_label = DeviceCustomLabel.from_value(old_label_value) if old_label_value else None
+
+    device_ledger.update_device_label(device_name=device_name, expected_label=old_label, label=label)
+    if label != DeviceCustomLabel.deactivated and old_label != DeviceCustomLabel.deactivated:
+        return
+
+    try:
+        fleet_index.update_device_active_state(device_name=device_name, active=label != DeviceCustomLabel.deactivated)
+    except Exception:
+        logger.exception("failed to update thing %s label from %s to %s", device_name, old_label, label)
+        try:
+            # try compensating device ledger update
+            device_ledger.update_device_label(device_name=device_name, expected_label=label, label=old_label)
+        except Exception:
+            logger.exception("unable to revert device %s label from %s to %s", device_name, label, old_label)
+            raise
+        raise
 
 def list_providers(
     name_like: str | None = None,

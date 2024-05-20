@@ -73,6 +73,11 @@ def _build_scan_params(
             "ComparisonOperator": "EQ",
             "AttributeValueList": [label.value],
         }
+    if not label:
+        scan_filter["customLabel"] = {
+            "ComparisonOperator": "NE",
+            "AttributeValueList": [DeviceCustomLabel.deactivated.value],
+        }
     if unprovisioned_only:
         scan_filter["provStatus"] = {"ComparisonOperator": "NULL"}
 
@@ -119,15 +124,25 @@ def find_device(provider: str | None, organization: str | None, device_name: str
     )
 
 
-def update_device_label(provider: str | None = None, organization: str | None = None, *, device_name: str, label: DeviceCustomLabel):
-    conditions = []
-    additional_attribute_values = {}
+def update_device_label(
+    provider: str | None = None,
+    organization: str | None = None,
+    *,
+    device_name: str,
+    expected_label: DeviceCustomLabel | None,
+    label: DeviceCustomLabel | None,
+):
+    conditions: list[str] = []
+    additional_attribute_values: dict = {}
     if provider is not None:
         conditions.append("jwtGroup=:provider")
         additional_attribute_values[":provider"] = provider
     if organization is not None:
         conditions.append("org=:organization")
         additional_attribute_values[":organization"] = organization
+    if expected_label is not None:
+        conditions.append("customLabel=:expectedCustomLabel")
+        additional_attribute_values[":expectedCustomLabel"] = expected_label.value if expected_label else None
 
     if conditions:
         kwargs = {"ConditionExpression": " AND ".join(conditions)}
@@ -138,7 +153,7 @@ def update_device_label(provider: str | None = None, organization: str | None = 
         Key={"serialNumber": device_name},
         UpdateExpression="SET customLabel=:customLabel",
         ExpressionAttributeValues={
-            ":customLabel": label.value,
+            ":customLabel": label.value if label else None,
             **additional_attribute_values,
         },
         **kwargs, # type: ignore
