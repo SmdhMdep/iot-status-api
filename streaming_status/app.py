@@ -201,10 +201,10 @@ def check_device_access(func):
 def update_device(device_name: str):
     body = app.current_event.json_body
     if not isinstance(body, dict):
-        raise AppError.invalid_argument('body must be a json object with a label')
+        raise AppError.invalid_argument('body must be a json object with a label property')
 
     raw_label = body.get('label')
-    label = parse_device_custom_label(raw_label)
+    label = parse_device_custom_label(raw_label) if raw_label else None
 
     repo.update_device_label(device_name, label)
 

@@ -26,7 +26,6 @@ DeviceInfo = TypedDict("DeviceInfo", {
 
 
 class DeviceCustomLabel(StrEnum):
-    none = 'NONE'
     deployed = 'DEPLOYED'
     undeployed = 'UNDEPLOYED'
     periodic_batch = 'PERIODIC_BATCH'
@@ -85,8 +84,8 @@ def entity_to_model(
             "lastStreamBatchTimestamp": last_stream_ts.timestamp() if last_stream_ts else None,
         } if stream_preview else {}),
         **({
-            'label': DeviceCustomLabel.from_value(label) if label is not None else DeviceCustomLabel.none
-        } if ledger_entity is not None else {}),
+            'label': DeviceCustomLabel.from_value(label)
+        } if ledger_entity is not None and label is not None else {}),
     }
 
 def _connectivity_to_model(fleet_entity=None, use_default_unprovisioned=True) -> DeviceConnectivity | None:

@@ -37,7 +37,7 @@ def parse_date_range_or_default(range_value):
     return (start_date, end_date)
 
 
-def parse_device_custom_label(raw_label: str | None) -> DeviceCustomLabel:
+def parse_device_custom_label(raw_label: str) -> DeviceCustomLabel:
     label = None
     if isinstance(raw_label, str):
         label = DeviceCustomLabel.from_value(raw_label)
