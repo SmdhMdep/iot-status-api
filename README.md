@@ -12,7 +12,8 @@ This API exposes the following endpoints:
 ## Getting started
 
 1. Install serverless CLI using `npm install -g serverless`.
-2. Install serverless plugins defined in this package by running `npm install`.
+2. Install serverless plugins defined in this package by running `npm install`
+preferably with the node version specified in `.node-version`.
 3. **RECOMMENDED** create a new virtual environment preferably using the python version
 specified in `.python-version` file, venv can be used to do so `python -m venv .venv`
 (you can change `.venv` with any path you want), and then activate it `source .venv/bin/activate`.
