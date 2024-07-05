@@ -1,4 +1,3 @@
-import re
 from datetime import datetime
 from io import BytesIO
 
@@ -15,22 +14,14 @@ s3_client = boto3.client('s3', region_name=config.stream_data_bucket_region)
 
 _PREVIEW_MAX_LINES = 5
 
-_camel_to_kebab_case_pattern = re.compile(r'(?<!^)(?=[A-Z])')
-
-
-def canonicalize_project_name(name: str) -> str:
-    return _camel_to_kebab_case_pattern.sub('-', name).lower()
-
 
 def get_stream_preview(topic: str) -> tuple[str, datetime | None] | None:
     # topic name format: ($aws/?)rules/<rule_name>/<version>/<org>/<project>/<resource>
     _, _, org_name, project_name, resource_name = (
         topic.removeprefix('$aws/').removeprefix('rules/').split('/')
     )
-    project_name = canonicalize_project_name(project_name)
-    package_name = '--'.join((org_name, project_name))
 
-    if not (package := _find_package(id=package_name)):
+    if not (package := _find_package(org_name, project_name)):
         return None
 
     if not (resource := _find_storage_path(package, resource_name)):
@@ -64,10 +55,10 @@ def _find_storage_path(package: dict, name: str) -> tuple[str, datetime | None] 
     return None
 
 
-def _find_package(id: str):
+def _find_package(org_name: str, project_name: str):
     response = requests.get(
-        f'{config.mdep_url}/api/3/action/package_show',
-        params={'id': id},
+        f'{config.mdep_url}/api/3/action/cloudstorage_package_show',
+        params={'org_name': org_name, 'name': project_name},
         headers={'Authorization': config.mdep_api_key}
     )
     if response.status_code == requests.codes['not_found']:
@@ -76,7 +67,7 @@ def _find_package(id: str):
         # FIXME: forbidden status code should be treated as an error but for some reason even though
         # the API token being used has admin privileges, the API refuses to allow access to some packages
         # probably error from CKAN. For now we're just logging and ignoring it.
-        logger.error('got forbidden status code from MDEP API trying to request /api/3/action/package_show with id %s', id)
+        logger.error('got forbidden status code from MDEP API trying to request cloudstorage_package_show with name %s', project_name)
         return None
     response.raise_for_status()
 
