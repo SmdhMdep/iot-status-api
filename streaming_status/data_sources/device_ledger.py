@@ -81,7 +81,11 @@ def _build_scan_params(
     if unprovisioned_only:
         scan_filter["provStatus"] = {"ComparisonOperator": "NULL"}
 
-    return {"ScanFilter": scan_filter}
+    params: dict = {"ScanFilter": scan_filter}
+    if config.device_ledger_index_name:
+        params["IndexName"] = config.device_ledger_index_name
+
+    return params
 
 def _scan_table(
     parameters: dict,
@@ -91,12 +95,12 @@ def _scan_table(
 ):
     scan_page, items = page, []
     while True:
-        params = {
-            **parameters,
-            **({"ExclusiveStartKey": scan_page} if scan_page else {}),
-            **({"Limit": page_size} if page_size else {}),
-        }
-        result = dynamodb.Table(config.device_ledger_table_name).scan(**params)
+        if scan_page:
+            parameters["ExclusiveStartKey"] = scan_page
+        if page_size:
+            parameters["Limit"] = page_size
+
+        result = dynamodb.Table(config.device_ledger_table_name).scan(**parameters)
         items.extend(result["Items"])
 
         next_page = result.get("LastEvaluatedKey")
