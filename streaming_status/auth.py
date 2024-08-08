@@ -13,6 +13,7 @@ class Role(StrEnum):
     external_installer = 'external-installer'
     data_scientist = 'data-scientist'
     organization_member = 'org-member'
+    optional_schema = 'optional-schema'
 
 
 class Permission(StrEnum):
@@ -20,6 +21,7 @@ class Permission(StrEnum):
     organizations_read = 'organizations:read'
     devices_create = 'devices:create'
     device_update = 'device:update'
+    optional_schema = 'optional_schema'
 
     @staticmethod
     def merge_inplace(into: dict['Permission', bool], from_: dict['Permission', bool]):
@@ -59,6 +61,9 @@ _role_permissions = {
         Permission.devices_create: False,
         Permission.device_update: False,
     },
+    Role.optional_schema.value: {
+        Permission.optional_schema: True,
+    }
 }
 
 
@@ -102,6 +107,9 @@ class Auth:
                 Permission.merge_inplace(permissions, ps)
 
         return permissions
+
+    def has_auto_warehouse_opt_out(self) -> bool:
+        return bool(self._introspect_token().get('auto_warehouse_opt_out', False))
 
     def _introspect_token(self) -> dict:
         self._introspected_token = (
