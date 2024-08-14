@@ -198,9 +198,9 @@ def check_device_access(func):
     return wrapper
 
 
-@app.put('/devices/<device_name>')
+@app.put('/devices/<device_name>/label')
 @check_device_access
-@require_permission(Permission.device_update)
+@require_permission(Permission.devices_update)
 def update_device(device_name: str):
     body = app.current_event.json_body
     if not isinstance(body, dict):
