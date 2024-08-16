@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TypedDict, NotRequired
+from typing import TypedDict, NotRequired, NamedTuple
 from enum import StrEnum
 
 from .data_sources.constants import ThingAttributeNames, DISCONNECT_REASON_DESCRIPTIONS
@@ -36,19 +36,6 @@ class DeviceCustomLabel(StrEnum):
         return next((status for status in cls if status.value == value), None)
 
 
-Device = TypedDict("Device", {
-    "name": str,
-    "provider": str | None,
-    "organization": str | None,
-    "connectivity": DeviceConnectivity | None,
-    "deviceInfo": NotRequired[DeviceInfo],
-    "label": NotRequired[DeviceCustomLabel],
-    "dataSchema": NotRequired[str],
-    # a JSONL file preview
-    "streamPreview": NotRequired[str],
-    "streamLastBatchTimestamp": Timestamp | None,
-})
-
 DeviceDataSchema = TypedDict("DeviceDataSchema", {
     "id": str,
     "provider": str,
@@ -57,11 +44,27 @@ DeviceDataSchema = TypedDict("DeviceDataSchema", {
     "version": int,
 })
 
+Device = TypedDict("Device", {
+    "name": str,
+    "provider": str | None,
+    "organization": str | None,
+    "connectivity": DeviceConnectivity | None,
+    "deviceInfo": NotRequired[DeviceInfo],
+    "label": NotRequired[DeviceCustomLabel],
+    # legacy field provided for backwards compatibility. Use `schema` instead.
+    "dataSchema": NotRequired[str],
+    "schema": DeviceDataSchema | None,
+    # a JSONL file preview
+    "streamPreview": NotRequired[str],
+    "streamLastBatchTimestamp": Timestamp | None,
+})
+
 
 def device_entity_to_model(
     *,
     fleet_entity=None,
     ledger_entity=None,
+    schema_entity=None,
     stream_preview: tuple[str, datetime | None] | None = None,
     ledger_entity_unprovisioned: bool = True,
 ) -> Device:
@@ -72,15 +75,13 @@ def device_entity_to_model(
         ledger_entity["jwtGroup"] if ledger_entity and "jwtGroup" in ledger_entity
         else fleet_entity_attrs.get(ThingAttributeNames.SENSOR_PROVIDER)
     )
-    provider = ' '.join(map(str.capitalize, provider.split("-"))) if provider else None
     organization = (
         ledger_entity['org'] if ledger_entity
         else fleet_entity_attrs.get(ThingAttributeNames.SENSOR_ORGANIZATION)
     )
-    organization = ' '.join(map(str.capitalize, organization.split("-"))) if organization else None
 
     last_stream_ts = stream_preview[1] if stream_preview else None
-    data_schema = (ledger_entity or {}).get("json_schema")
+    schema_model = schema_entity_to_model(schema_entity) if schema_entity else None
     label = (ledger_entity or {}).get("customLabel")
 
     return {
@@ -93,7 +94,10 @@ def device_entity_to_model(
             "streamPreview": stream_preview[0],
             "lastStreamBatchTimestamp": last_stream_ts.timestamp() if last_stream_ts else None,
         } if stream_preview else {}),
-        **({"dataSchema": data_schema} if data_schema is not None and data_schema != '{}' else {}),
+        **({
+            "dataSchema": schema_model["schema"],
+            "schemaSpec": schema_model,
+        } if schema_model is not None else {}),
         **({
             'label': DeviceCustomLabel.from_value(label)
         } if ledger_entity is not None and label is not None else {}),

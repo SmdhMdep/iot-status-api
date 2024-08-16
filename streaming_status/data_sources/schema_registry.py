@@ -1,8 +1,10 @@
 import base64
 import json
-from typing import Iterable
+from hashlib import md5
+from typing import Iterable, Tuple
 
 import boto3
+import boto3.dynamodb.conditions as conditions
 
 from ..errors import AppError
 from ..config import config
@@ -17,7 +19,6 @@ def list_schemas(
     page: str | None = None,
     page_size: int | None = None
 ) -> tuple[str | None, Iterable[dict]]:
-    logger.info("page parameter: %s", page)
     try:
         decoded_page = (
             json.loads(base64.decodebytes(page.encode()).decode())
@@ -48,7 +49,7 @@ def list_schemas(
 
     return next_page_encoded, sorted(
         result["Items"],
-        key=lambda item: (item["title"], -item["version"])
+        key=lambda item: (item["jwtGroup"], item["title"], -item["version"])
     )
 
 
@@ -58,4 +59,25 @@ def get_schema(provider: str | None, id: str) -> dict | None:
     if item is not None:
         if provider is None or item.get("jwtGroup") == provider:
             return item
+    return None
+
+
+def get_schema_by_hash(provider: str, json_schema: str) -> dict | None:
+    schema_hash = md5((json_schema + provider).encode()).hexdigest()
+    items = schemas_table.query(
+        IndexName='schemaHash-index',
+        KeyConditionExpression=conditions.Key('schemaHash').eq(schema_hash)
+    ).get('Items')
+    item = items[0] if items else None
+
+    if item and item.get('jwtGroup') == provider:
+        title, version = item['title'], item['version']
+        return {
+            'id': item.get('id', None),
+            'title': title,
+            'version': version,
+            'jwtGroup': item.get('jwtGroup'),
+            'jsonSchema': json_schema,
+        }
+
     return None

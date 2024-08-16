@@ -4,7 +4,7 @@ from typing import TypedDict, TypeVar, Generic, NotRequired
 from .errors import AppError
 from .model import device_entity_to_model as entity_to_model, schema_entity_to_model, Device, DeviceCustomLabel
 from .utils import logger
-from .data_sources import device_ledger, fleet_index, stream_data, keycloak_api
+from .data_sources import device_ledger, fleet_index, stream_data, keycloak_api, schema_registry
 
 
 device_name_regex = re.compile(r'[a-zA-Z0-9:_-]+')
@@ -93,8 +93,15 @@ def get_device(
     ledger_device = device_ledger.find_device(provider, organization, device_name)
     if not ledger_device:
         raise AppError.not_found(f'device with name {device_name} is not registered')
+
     if brief_repr:
         return entity_to_model(ledger_entity=ledger_device)
+
+    json_schema: str | None = ledger_device.get("json_schema")
+    schema_entity = schema_registry.get_schema_by_hash(
+        provider=ledger_device["jwtGroup"],
+        json_schema=json_schema,
+    ) if json_schema is not None else None
 
     fleet_device = fleet_index.find_device(provider, organization, device_name)
 
@@ -107,7 +114,12 @@ def get_device(
         logger.exception("(suppressed) error fetching stream preview")
         preview = "<error fetching preview>", None
 
-    return entity_to_model(fleet_entity=fleet_device, ledger_entity=ledger_device, stream_preview=preview)
+    return entity_to_model(
+        fleet_entity=fleet_device,
+        ledger_entity=ledger_device,
+        stream_preview=preview,
+        schema_entity=schema_entity,
+    )
 
 def update_device_label(device_name: str, label: DeviceCustomLabel | None):
     item = device_ledger.find_device(provider=None, organization=None, device_name=device_name)

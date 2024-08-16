@@ -118,6 +118,9 @@ def find_device(provider: str | None, organization: str | None, device_name: str
     device_provider = device_info.get("jwtGroup") # type: ignore
     device_organization = device_info.get("org") # type: ignore
 
+    if device_info.get("jsonSchema") == "{}":
+        device_info["jsonSchema"] = None
+
     return (
         device_info
         if (
