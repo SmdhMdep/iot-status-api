@@ -17,9 +17,14 @@ _PREVIEW_MAX_LINES = 5
 
 def get_stream_preview(topic: str) -> tuple[str, datetime | None] | None:
     # topic name format: ($aws/?)rules/<rule_name>/<version>/<org>/<project>/<resource>
-    _, _, org_name, project_name, resource_name = (
-        topic.removeprefix('$aws/').removeprefix('rules/').split('/')
-    )
+    try:
+        _, _, org_name, project_name, resource_name = (
+            topic.removeprefix('$aws/').removeprefix('rules/').split('/')
+        )
+    except ValueError:
+        # topic doesn't follow convention, just ignore it
+        logger.warning("device has unexpected topic: %s", topic)
+        return None
 
     if not (package := _find_package(org_name, project_name)):
         return None
