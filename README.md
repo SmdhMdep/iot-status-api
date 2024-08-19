@@ -2,6 +2,7 @@
 
 This API exposes the following endpoints:
 
+- /api/me - get information about current user including permissions
 - /api/me/permissions - list the permissions for the current user
 - /api/devices - list all devices for the provider
 - /api/devices/export - export a list of all devices into csv or json

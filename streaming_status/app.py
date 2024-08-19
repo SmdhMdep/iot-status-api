@@ -99,8 +99,8 @@ def pass_provider(route):
 
     The decorated route must accept a keyword argument named `provider`.
     """
-    if config.is_offline:
-        return _offline_pass_provider(route)
+    # if config.is_offline:
+    #     return _offline_pass_provider(route)
 
     @functools.wraps(route)
     def wrapper(*args, **kwargs):
@@ -301,6 +301,21 @@ def get_data_schema(schema_id, provider: str | None):
         raise AppError.not_found("no such schema")
 
     return schema
+
+
+@app.get('/me')
+def me():
+    auth = get_auth(app)
+
+    if not (groups := auth.group_memberships()):
+        raise AppError.unauthorized("not part of any group")
+    group = groups[0]
+
+    return {
+        'permissions': auth.get_permissions(),
+        'name': auth.name(),
+        'group': repo._canonicalize_group_name(group),
+    }
 
 
 @app.get('/me/permissions')

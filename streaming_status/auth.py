@@ -82,6 +82,10 @@ class Auth:
     def email(self) -> str:
         return self._introspect_token()['email']
 
+    def name(self) -> str:
+        token = self._introspect_token()
+        return token.get('name') or token['email']
+
     def group_memberships(self) -> list[str]:
         return self._introspect_token().get('groups', [])
 
