@@ -35,8 +35,8 @@ class _Config:
         return os.environ['DEVICE_LEDGER_TABLE_NAME']
 
     @property
-    def device_ledger_index_name(self) -> str:
-        return os.environ['DEVICE_LEDGER_INDEX_NAME']
+    def device_ledger_index_name(self) -> str | None:
+        return os.environ.get('DEVICE_LEDGER_INDEX_NAME')
 
     @property
     def device_ledger_table_region(self) -> str:

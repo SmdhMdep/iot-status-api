@@ -31,8 +31,8 @@ def list_devices(
     page: str | None = None,
     page_size: int | None = DEFAULT_PAGE_SIZE,
 ) -> PaginatedResult[str, Device]:
-    provider = _canonicalize_group_name(provider)
-    organization = _canonicalize_group_name(organization)
+    provider = _maybe_canonicalize_group_name(provider)
+    organization = _maybe_canonicalize_group_name(organization)
     ledger_page, fleet_page = _load_page(page)
     ledger_items, fleet_items, next_page = [], [], None # type: ignore
     query_ledger_only = label is not None
@@ -73,8 +73,8 @@ def list_devices(
     )
 
 def export_devices(provider: str | None, organization: str | None) -> list[Device]:
-    provider = _canonicalize_group_name(provider)
-    organization = _canonicalize_group_name(organization)
+    provider = _maybe_canonicalize_group_name(provider)
+    organization = _maybe_canonicalize_group_name(organization)
     _, fleet_items = fleet_index.list_devices(provider=provider, organization=organization)
     _, ledger_items = device_ledger.list_devices(provider=provider, organization=organization)
     return _merge_entities_to_models(fleet_items, ledger_items)
@@ -85,8 +85,8 @@ def get_device(
     device_name: str,
     brief_repr: bool = False,
 ) -> Device:
-    provider = _canonicalize_group_name(provider)
-    organization = _canonicalize_group_name(organization)
+    provider = _maybe_canonicalize_group_name(provider)
+    organization = _maybe_canonicalize_group_name(organization)
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
 
@@ -146,24 +146,28 @@ def update_device_label(device_name: str, label: DeviceCustomLabel | None):
         raise
 
 def list_providers(
+    organization: str | None = None,
     name_like: str | None = None,
     page: int | None = None,
     page_size: int = DEFAULT_PAGE_SIZE,
 ) -> PaginatedResult[int, str]:
+    name_like = _keycloak_group_name(name_like) if name_like else name_like
     next_page, groups = keycloak_api.groups(
         name_like=name_like, page=page or 0, page_size=page_size
     )
-    return {'items': groups, 'nextPage': next_page}
+    return {'items': [_canonicalize_group_name(g) for g in groups], 'nextPage': next_page}
 
 def list_organizations(
+    provider: str | None = None,
     name_like: str | None = None,
     page: int | None = None,
     page_size: int = DEFAULT_PAGE_SIZE,
-):
+) -> PaginatedResult[int, str]:
+    name_like = _keycloak_group_name(name_like) if name_like else name_like
     next_page, groups = keycloak_api.groups(
         name_like=name_like, page=page or 0, page_size=page_size
     )
-    return {'items': groups, 'nextPage': next_page}
+    return {'items': [_canonicalize_group_name(g) for g in groups], 'nextPage': next_page}
 
 def list_schemas(
     provider: str | None,
@@ -172,7 +176,7 @@ def list_schemas(
 ):
     from .data_sources import schema_registry
 
-    provider = _canonicalize_group_name(provider)
+    provider = _maybe_canonicalize_group_name(provider)
     next_page, items = schema_registry.list_schemas(provider, page, page_size)
     return {
         'items': [schema_entity_to_model(item) for item in items],
@@ -182,12 +186,26 @@ def list_schemas(
 def get_schema(provider: str | None, id: str):
     from .data_sources import schema_registry
 
-    provider = _canonicalize_group_name(provider)
+    provider = _maybe_canonicalize_group_name(provider)
     schema = schema_registry.get_schema(provider, id)
     return schema_entity_to_model(schema) if schema is not None else None
 
-def _canonicalize_group_name(group: str | None) -> str | None:
-    return '-'.join(group.lower().split(' ')) if group is not None else None
+def _canonicalize_group_name(group: str) -> str:
+    return '-'.join(group.lower().split(' '))
+
+def _maybe_canonicalize_group_name(group: str | None) -> str | None:
+    return _canonicalize_group_name(group) if group is not None else None
+
+def _keycloak_group_name(group: str) -> str:
+    name = [group[0]]
+    for i in range(1, len(group) - 1):
+        is_space = group[i] == '-' and (group[i - 1] != '-' or group[i + 1] != '-')
+        name.append(' ' if is_space else group[i])
+
+    if group[-1] != '-':
+        name.append(group[-1])
+
+    return ''.join(name)
 
 def _load_page(page: str | None) -> tuple[LedgerPage, FleetPage]:
     if not page:
