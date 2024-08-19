@@ -9,6 +9,9 @@ provider:
   deploymentMethod: direct
   runtime: python3.11
   region: eu-west-1
+  deploymentBucket:
+    name: ${env:SERVERLESS_DEPLOYMENT_BUCKET, "smdh-iot-app"}
+  deploymentPrefix: api/serverless
   versionFunctions: false
   architecture: "x86_64"
   environment:
@@ -123,3 +126,4 @@ functions:
 plugins:
   - serverless-python-requirements
   - serverless-offline
+  - serverless-deployment-bucket
