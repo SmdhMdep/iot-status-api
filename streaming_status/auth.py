@@ -97,6 +97,14 @@ class Auth:
                 .get('roles', [])
         )
 
+    def is_admin(self) -> bool:
+        roles = self._roles()
+        return (
+            Role.admin.value in roles
+            # avoid mistakenly making an external installer an admin
+            and Role.external_installer not in roles
+        )
+
     def has_permission(self, *permissions: Permission) -> bool:
         current_permissions = self.get_permissions()
         return all(current_permissions[permission] for permission in permissions)

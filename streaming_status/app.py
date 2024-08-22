@@ -268,20 +268,31 @@ def post_device_alarms_unsubscribe(device_name: str):
 @app.get('/providers')
 @require_permission(Permission.providers_read)
 def list_providers():
-    query, page = (
-        app.current_event.get_query_string_value("query"),
-        get_query_integer_value(app.current_event, "page"),
-    )
+    auth = get_auth(app)
 
-    return repo.list_providers(name_like=query, page=page)
+    return repo.list_providers(
+        organization=get_request_organization(app),
+        name_like=app.current_event.get_query_string_value("query"),
+        page=get_query_integer_value(app.current_event, "page"),
+        all=auth.is_admin(),
+    )
 
 
 @app.get('/organizations')
 @require_permission(Permission.organizations_read)
-def list_organizations():
+@pass_provider
+def list_organizations(provider):
+    auth = get_auth(app)
+    all_orgs = (
+        app.current_event.get_query_string_value("all", "1") == "1"
+        or auth.is_admin()
+    )
+
     return repo.list_organizations(
+        provider=provider,
         name_like=app.current_event.get_query_string_value("query"),
         page=get_query_integer_value(app.current_event, "page"),
+        all=all_orgs,
     )
 
 @app.get('/schemas')

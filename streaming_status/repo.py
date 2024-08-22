@@ -1,6 +1,7 @@
 import re
 from typing import TypedDict, TypeVar, Generic, NotRequired
 
+from .config import config
 from .errors import AppError
 from .model import device_entity_to_model as entity_to_model, schema_entity_to_model, Device, DeviceCustomLabel
 from .utils import logger
@@ -148,26 +149,59 @@ def update_device_label(device_name: str, label: DeviceCustomLabel | None):
 def list_providers(
     organization: str | None = None,
     name_like: str | None = None,
-    page: int | None = None,
+    page: str | None = None,
     page_size: int = DEFAULT_PAGE_SIZE,
-) -> PaginatedResult[int, str]:
-    name_like = _keycloak_group_name(name_like) if name_like else name_like
-    next_page, groups = keycloak_api.groups(
-        name_like=name_like, page=page or 0, page_size=page_size
-    )
-    return {'items': [_canonicalize_group_name(g) for g in groups], 'nextPage': next_page}
+    all: bool = True,
+) -> PaginatedResult[str, str]:
+    if config.device_ledger_groups_index_name is not None and not all:
+        organization = _maybe_canonicalize_group_name(organization)
+        next_page, groups = device_ledger.list_providers(
+            organization=organization,
+            name_like=name_like,
+        )
+
+        return {'items': groups, 'nextPage': next_page}
+    else:
+        name_like = _keycloak_group_name(name_like) if name_like else name_like
+        kc_page = _parse_int(page, "page")
+        next_page, groups = keycloak_api.groups(name_like=name_like, page=kc_page, page_size=page_size)
+
+        return {
+            'items': [_canonicalize_group_name(g) for g in groups],
+            'nextPage': str(next_page) if next_page else None,
+        }
 
 def list_organizations(
     provider: str | None = None,
     name_like: str | None = None,
-    page: int | None = None,
+    page: str | None = None,
     page_size: int = DEFAULT_PAGE_SIZE,
-) -> PaginatedResult[int, str]:
-    name_like = _keycloak_group_name(name_like) if name_like else name_like
-    next_page, groups = keycloak_api.groups(
-        name_like=name_like, page=page or 0, page_size=page_size
-    )
-    return {'items': [_canonicalize_group_name(g) for g in groups], 'nextPage': next_page}
+    all: bool = True,
+) -> PaginatedResult[str, str]:
+    logger.info(config.device_ledger_groups_index_name)
+    if config.device_ledger_groups_index_name is not None and not all:
+        provider = _maybe_canonicalize_group_name(provider)
+        next_page, groups = device_ledger.list_organizations(
+            provider=provider,
+            name_like=name_like,
+        )
+
+        return {'items': groups, 'nextPage': next_page}
+    else:
+        name_like = _keycloak_group_name(name_like) if name_like else name_like
+        kc_page = _parse_int(page, "page")
+        next_page, groups = keycloak_api.groups(name_like=name_like, page=kc_page, page_size=page_size)
+
+        return {
+            'items': [_canonicalize_group_name(g) for g in groups],
+            'nextPage': str(next_page) if next_page else None,
+        }
+
+def _parse_int(value: str | None, name: str) -> int:
+    try:
+        return int(value) if value else 0
+    except ValueError:
+        raise AppError.invalid_argument(f"{name}: expected an int")
 
 def list_schemas(
     provider: str | None,
