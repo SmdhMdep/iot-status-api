@@ -98,7 +98,7 @@ class Auth:
             permissions = _role_permissions[Role.external_installer]
         else:
             permissions = {}
-            for ps in (_role_permissions[r] for r in roles):
+            for ps in (_role_permissions[r] for r in roles if r in _role_permissions):
                 Permission.merge_inplace(permissions, ps)
 
         return permissions
