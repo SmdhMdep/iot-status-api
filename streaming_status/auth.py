@@ -90,20 +90,24 @@ class Auth:
         return self._introspect_token().get('groups', [])
 
     def _roles(self) -> list[str]:
-        return (
+        roles = (
             self._introspect_token()
                 .get('resource_access', {})
                 .get(config.oidc_client_id, {})
                 .get('roles', [])
         )
 
+        if Role.external_installer in roles:
+            # special case for external installers as they have the installer role as well.
+            # NOTE: device registration API does not recognize external installer role and so requires the installer role.
+            if Role.installer in roles: roles.remove(Role.installer)
+            # A user cannot be both an admin and an external installer. Assume least privilege.
+            if Role.admin in roles: roles.remove(Role.admin)
+        return roles
+
+
     def is_admin(self) -> bool:
-        roles = self._roles()
-        return (
-            Role.admin.value in roles
-            # avoid mistakenly making an external installer an admin
-            and Role.external_installer not in roles
-        )
+        return Role.admin in self._roles()
 
     def has_permission(self, *permissions: Permission) -> bool:
         current_permissions = self.get_permissions()
@@ -113,14 +117,9 @@ class Auth:
         permissions: dict[Permission, bool]
         roles = self._roles()
 
-        # special case for external installers as they have the installer role as well
-        # but we don't want them to be able to list organizations/installers
-        if Role.external_installer in roles and Role.installer in roles:
-            permissions = _role_permissions[Role.external_installer]
-        else:
-            permissions = {}
-            for ps in (_role_permissions[r] for r in roles if r in _role_permissions):
-                Permission.merge_inplace(permissions, ps)
+        permissions = {}
+        for ps in (_role_permissions[r] for r in roles if r in _role_permissions):
+            Permission.merge_inplace(permissions, ps)
 
         return permissions
 
