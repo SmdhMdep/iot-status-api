@@ -5,29 +5,22 @@ from typing import Callable
 import boto3
 from boto3.dynamodb.conditions import Attr, ConditionBase, Key
 
-from ..errors import AppError
 from ..config import config
+from ..errors import AppError
 from ..model import DeviceCustomLabel
-
 
 dynamodb = boto3.resource("dynamodb", region_name=config.device_ledger_table_region)
 
 
 def _decode_page(page: str | None) -> dict | None:
     try:
-        return (
-            json.loads(base64.decodebytes(page.encode()).decode())
-            if page else None
-        )
+        return json.loads(base64.decodebytes(page.encode()).decode()) if page else None
     except:
         raise AppError.invalid_argument("invalid page key")
 
 
 def _encode_page(page: dict | None) -> str | None:
-    return (
-        base64.encodebytes(json.dumps(page).encode()).decode()
-        if page else None
-    )
+    return base64.encodebytes(json.dumps(page).encode()).decode() if page else None
 
 
 def list_devices(
@@ -51,15 +44,15 @@ def list_devices(
     )
 
     items = []
+
     def collect_items(result):
-        items.extend(result.get('Items', []))
+        items.extend(result.get("Items", []))
         return len(items)
 
-    next_page = _scan_table(
-        params, page=decoded_page, page_size=page_size, collector=collect_items
-    )
+    next_page = _scan_table(params, page=decoded_page, page_size=page_size, collector=collect_items)
 
     return _encode_page(next_page), items
+
 
 def _build_scan_params(
     provider: str | None,
@@ -108,8 +101,8 @@ def _build_scan_params(
 def find_device(provider: str | None, organization: str | None, device_name: str):
     key = {"serialNumber": device_name}
     device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get("Item", {})
-    device_provider: str = device_info.get("jwtGroup") # type: ignore
-    device_organization: str = device_info.get("org") # type: ignore
+    device_provider: str = device_info.get("jwtGroup")  # type: ignore
+    device_organization: str = device_info.get("org")  # type: ignore
 
     if device_info.get("jsonSchema") == "{}":
         device_info["jsonSchema"] = None
@@ -156,8 +149,9 @@ def update_device_label(
             ":customLabel": label.value if label else None,
             **additional_attribute_values,
         },
-        **kwargs, # type: ignore
+        **kwargs,  # type: ignore
     )
+
 
 def list_providers(
     organization: str | None,
@@ -169,29 +163,28 @@ def list_providers(
 
     condition: ConditionBase | None = None
     if organization:
-        condition = Attr('org').eq(organization)
+        condition = Attr("org").eq(organization)
     if name_like:
-        name_like_condition = Attr('jwtGroup').begins_with(name_like)
+        name_like_condition = Attr("jwtGroup").begins_with(name_like)
         condition = condition and name_like_condition if condition else name_like_condition
 
-    params: dict = {'IndexName': config.device_ledger_groups_index_name}
+    params: dict = {"IndexName": config.device_ledger_groups_index_name}
     if condition:
-        params['FilterExpression'] = condition
+        params["FilterExpression"] = condition
     if page:
         decoded_page = _decode_page(page)
-        params['ExclusiveStartKey'] = decoded_page
+        params["ExclusiveStartKey"] = decoded_page
     if page_size:
         params["Limit"] = page_size
 
     items: set[str] = set()
+
     def collect_items(result):
-        items.update(item['jwtGroup'] for item in result.get('Items', []))
+        items.update(item["jwtGroup"] for item in result.get("Items", []))
         return len(items)
 
     decoded_page = _decode_page(page)
-    next_page = _scan_table(
-        params, page=decoded_page, page_size=page_size, collector=collect_items
-    )
+    next_page = _scan_table(params, page=decoded_page, page_size=page_size, collector=collect_items)
 
     return _encode_page(next_page), list(items)
 
@@ -204,15 +197,15 @@ def _list_organizations_for_provider(
 ) -> tuple[str | None, list[str]]:
     assert config.device_ledger_groups_index_name is not None
 
-    condition: ConditionBase = Key('jwtGroup').eq(provider)
+    condition: ConditionBase = Key("jwtGroup").eq(provider)
     if name_like:
-        name_like_condition = Key('org').begins_with(name_like)
+        name_like_condition = Key("org").begins_with(name_like)
         condition = condition and name_like_condition if condition else name_like_condition
 
     params: dict = {}
     if page:
         decoded_page = _decode_page(page)
-        params['ExclusiveStartKey'] = decoded_page
+        params["ExclusiveStartKey"] = decoded_page
     if page_size:
         params["Limit"] = page_size
 
@@ -223,8 +216,8 @@ def _list_organizations_for_provider(
     )
 
     return (
-        _encode_page(result.get('LastEvaluatedKey')),
-        list({item['org'] for item in result.get('Items', [])}), # type: ignore
+        _encode_page(result.get("LastEvaluatedKey")),
+        list({item["org"] for item in result.get("Items", [])}),  # type: ignore
     )
 
 
@@ -239,23 +232,22 @@ def list_organizations(
     if provider is not None:
         return _list_organizations_for_provider(provider, name_like)
 
-    condition = Attr('jwtGroup').begins_with(name_like) if name_like else None
+    condition = Attr("jwtGroup").begins_with(name_like) if name_like else None
 
-    params: dict = {'IndexName': config.device_ledger_groups_index_name}
+    params: dict = {"IndexName": config.device_ledger_groups_index_name}
     if condition:
-        params['FilterExpression'] = condition
+        params["FilterExpression"] = condition
     if page_size:
-        params['Limit'] = page_size
+        params["Limit"] = page_size
 
     items: set[str] = set()
+
     def collect_items(result):
-        items.update(item['org'] for item in result.get('Items', []))
+        items.update(item["org"] for item in result.get("Items", []))
         return len(items)
 
     decoded_page = _decode_page(page)
-    next_page = _scan_table(
-        params, page=decoded_page, page_size=page_size, collector=collect_items
-    )
+    next_page = _scan_table(params, page=decoded_page, page_size=page_size, collector=collect_items)
 
     return _encode_page(next_page), list(items)
 
@@ -275,11 +267,11 @@ def _scan_table(
             parameters["Limit"] = page_size
 
         result = dynamodb.Table(config.device_ledger_table_name).scan(**parameters)
-        result_size += collector(result) # type: ignore
+        result_size += collector(result)  # type: ignore
 
         next_page = result.get("LastEvaluatedKey")
         if (page_size is None or result_size < page_size) and next_page is not None:
-            scan_page = next_page # type: ignore
+            scan_page = next_page  # type: ignore
         else:
             break
 

@@ -7,7 +7,6 @@ from aws_lambda_powertools.logging import Logger
 
 from .event import DisconnectionNotification
 
-
 logger = Logger()
 
 
@@ -22,28 +21,30 @@ Event date and time: {violation_datetime}
 
 DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX = os.environ["DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX"]
 
-sns_client = boto3.client('sns')
+sns_client = boto3.client("sns")
 
 
 @logger.inject_lambda_context
 def route_alarm_notification(event: dict, _):
     # always a single record
-    payload = event['Records'][0]["Sns"]["Message"]
+    payload = event["Records"][0]["Sns"]["Message"]
     notification: DisconnectionNotification = json.loads(payload)
 
     device_name = notification["thingName"]
     device_connectivity = (
-        "disconnected" if notification["violationEventType"] == "in-alarm"
-        else "connected" if notification["violationEventType"] == "alarm-cleared"
-        else "invalidated"
+        "disconnected"
+        if notification["violationEventType"] == "in-alarm"
+        else "connected" if notification["violationEventType"] == "alarm-cleared" else "invalidated"
     )
-    logger.append_keys(violation_event_details={
-        'device_name': device_name,
-        'event_type': notification["violationEventType"],
-        'event_timestamp': notification["violationEventTime"] / 1000,
-    })
+    logger.append_keys(
+        violation_event_details={
+            "device_name": device_name,
+            "event_type": notification["violationEventType"],
+            "event_timestamp": notification["violationEventTime"] / 1000,
+        }
+    )
 
-    if device_connectivity == 'invalidated':
+    if device_connectivity == "invalidated":
         logger.warning("skipping routing of invalidated alarm notification")
         return
 
@@ -53,7 +54,7 @@ def route_alarm_notification(event: dict, _):
         device_name=device_name,
         device_connectivity=device_connectivity,
         # example Wed, 11 Jan 2024 at 13:42:21 PM
-        violation_datetime=date.strftime('%a, %d %b %Y at %R'),
+        violation_datetime=date.strftime("%a, %d %b %Y at %R"),
     )
     topic_arn = f"{DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX}_{device_name}"
 

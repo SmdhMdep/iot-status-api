@@ -2,17 +2,16 @@ import re
 
 import boto3
 
-from ..errors import AppError
 from ..config import config
+from ..errors import AppError
 from ..utils import logger
 from .constants import ThingAttributeNames
 
-
-device_name_regex = re.compile(r'[a-zA-Z0-9:_-]+')
+device_name_regex = re.compile(r"[a-zA-Z0-9:_-]+")
 
 iot_client = boto3.client("iot", region_name=config.fleet_index_iot_region_name)
 
-DEACTIVATED_THINGS_GROUP_NAME = 'deactivated'
+DEACTIVATED_THINGS_GROUP_NAME = "deactivated"
 
 
 def list_devices(
@@ -24,7 +23,7 @@ def list_devices(
     page_size: int | None = None,
     active_only: bool = True,
 ):
-    query = f'attributes.{ThingAttributeNames.REGISTRATION_WAY}:*'
+    query = f"attributes.{ThingAttributeNames.REGISTRATION_WAY}:*"
 
     provider_quoted = provider.replace('"', '\\"') if provider else None
     if provider_quoted is not None:
@@ -38,21 +37,21 @@ def list_devices(
         if not device_name_regex.fullmatch(name_like):
             raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
         name_like_attr = name_like.replace(":", "\:")
-        query = f'{query} AND thingName:{name_like_attr}*'
+        query = f"{query} AND thingName:{name_like_attr}*"
 
     if active_only:
-        query = f'{query} AND NOT thingGroupNames:{DEACTIVATED_THINGS_GROUP_NAME}'
+        query = f"{query} AND NOT thingGroupNames:{DEACTIVATED_THINGS_GROUP_NAME}"
 
     request_params: dict = {}
     if page is not None:
-        request_params['nextToken'] = page
+        request_params["nextToken"] = page
     if page_size is not None:
-        request_params['maxResults'] = page_size
+        request_params["maxResults"] = page_size
 
     logger.info("search index query: %s", query)
     fleet_result = iot_client.search_index(queryString=query, **request_params)
 
-    return fleet_result.get('nextToken'), fleet_result.get("things") or []
+    return fleet_result.get("nextToken"), fleet_result.get("things") or []
 
 
 def find_device(provider: str | None, organization: str | None, device_name: str):
@@ -68,10 +67,10 @@ def find_device(provider: str | None, organization: str | None, device_name: str
         query = f'{query} AND attributes.{ThingAttributeNames.SENSOR_ORGANIZATION}:"{organization}"'
 
     result = iot_client.search_index(maxResults=1, queryString=query)
-    if not result['things']:
+    if not result["things"]:
         return None
 
-    return result['things'][0]
+    return result["things"][0]
 
 
 def update_device_active_state(device_name: str, active: bool):

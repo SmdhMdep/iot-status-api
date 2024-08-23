@@ -1,9 +1,8 @@
 from csv import DictWriter
-from io import TextIOBase, StringIO
+from io import StringIO, TextIOBase
 from typing import Any
 
 from .model import Device
-
 
 DEVICE_DTO_KEYS = [
     "name",
@@ -34,13 +33,11 @@ def _write_csv(file: TextIOBase, keys: list[str], data: list[Device]):
     writer = DictWriter(file, keys)
     writer.writeheader()
     for datum in data:
-        writer.writerow({
-            key: _read_value(datum, key) for key in keys
-        })
+        writer.writerow({key: _read_value(datum, key) for key in keys})
 
 
 def _read_value(data: Device, key: str):
-    segments = key.split('.')
+    segments = key.split(".")
     value: Any = data
 
     for segment in segments:

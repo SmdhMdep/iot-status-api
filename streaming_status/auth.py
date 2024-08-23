@@ -8,24 +8,24 @@ from .utils import AppError
 
 
 class Role(StrEnum):
-    admin = 'admin'
-    installer = 'installer'
-    external_installer = 'external-installer'
-    data_scientist = 'data-scientist'
-    organization_member = 'org-member'
-    optional_schema = 'optional-schema'
+    admin = "admin"
+    installer = "installer"
+    external_installer = "external-installer"
+    data_scientist = "data-scientist"
+    organization_member = "org-member"
+    optional_schema = "optional-schema"
 
 
 class Permission(StrEnum):
-    providers_read = 'providers:read'
-    organizations_read = 'organizations:read'
-    devices_create = 'devices:create'
-    devices_update = 'devices:update'
-    device_label_update = 'device_label:update'
-    optional_schema = 'optional_schema'
+    providers_read = "providers:read"
+    organizations_read = "organizations:read"
+    devices_create = "devices:create"
+    devices_update = "devices:update"
+    device_label_update = "device_label:update"
+    optional_schema = "optional_schema"
 
     @staticmethod
-    def merge_inplace(into: dict['Permission', bool], from_: dict['Permission', bool]):
+    def merge_inplace(into: dict["Permission", bool], from_: dict["Permission", bool]):
         for permission in from_:
             into[permission] = into.get(permission, False) or from_[permission]
         return into
@@ -67,44 +67,40 @@ _role_permissions = {
     },
     Role.optional_schema.value: {
         Permission.optional_schema: True,
-    }
+    },
 }
 
 
 class Auth:
     def __init__(self, event: APIGatewayProxyEventV2):
         self._event = event
-        auth_header = self._event.get_header_value('Authorization') or ''
-        self.token = auth_header.removeprefix('Bearer ')
+        auth_header = self._event.get_header_value("Authorization") or ""
+        self.token = auth_header.removeprefix("Bearer ")
         self._introspected_token: dict | None = None
         self._groups: list[str] | None = None
 
     def email(self) -> str:
-        return self._introspect_token()['email']
+        return self._introspect_token()["email"]
 
     def name(self) -> str:
         token = self._introspect_token()
-        return token.get('name') or token['email']
+        return token.get("name") or token["email"]
 
     def group_memberships(self) -> list[str]:
-        return self._introspect_token().get('groups', [])
+        return self._introspect_token().get("groups", [])
 
     def _roles(self) -> list[str]:
-        roles = (
-            self._introspect_token()
-                .get('resource_access', {})
-                .get(config.oidc_client_id, {})
-                .get('roles', [])
-        )
+        roles = self._introspect_token().get("resource_access", {}).get(config.oidc_client_id, {}).get("roles", [])
 
         if Role.external_installer in roles:
             # special case for external installers as they have the installer role as well.
             # NOTE: device registration API does not recognize external installer role and so requires the installer role.
-            if Role.installer in roles: roles.remove(Role.installer)
+            if Role.installer in roles:
+                roles.remove(Role.installer)
             # A user cannot be both an admin and an external installer. Assume least privilege.
-            if Role.admin in roles: roles.remove(Role.admin)
+            if Role.admin in roles:
+                roles.remove(Role.admin)
         return roles
-
 
     def is_admin(self) -> bool:
         return Role.admin in self._roles()
@@ -124,15 +120,12 @@ class Auth:
         return permissions
 
     def has_auto_warehouse_opt_out(self) -> bool:
-        return bool(self._introspect_token().get('auto_warehouse_opt_out', False))
+        return bool(self._introspect_token().get("auto_warehouse_opt_out", False))
 
     def _introspect_token(self) -> dict:
-        self._introspected_token = (
-            self._introspected_token
-            or keycloak_api.introspect_oidc_token(self.token)
-        )
+        self._introspected_token = self._introspected_token or keycloak_api.introspect_oidc_token(self.token)
 
-        if not self._introspected_token.get('active', True):
+        if not self._introspected_token.get("active", True):
             raise AppError.unauthorized("inactive token")
 
         return self._introspected_token

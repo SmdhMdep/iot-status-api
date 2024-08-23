@@ -1,12 +1,11 @@
-from datetime import datetime, timedelta
 import base64
 import json
+from datetime import datetime, timedelta
 
 import boto3
 
 from ..config import config
 from ..utils import AppError
-
 
 CONNECT = "Connect"
 PUBLISH_IN = "Publish-In"
@@ -38,7 +37,7 @@ def get_activity_metric(device_name: str, date_range: tuple[datetime, datetime])
             {
                 "Id": "publish",
                 "MetricStat": {
-                    "Metric": _metric_identity("PublishIn.Success", device_name), # type: ignore
+                    "Metric": _metric_identity("PublishIn.Success", device_name),  # type: ignore
                     # data is available for 15 days
                     "Period": 60,
                     "Stat": "SampleCount",
@@ -69,15 +68,15 @@ def get_connectivity_metric(
     if page is not None:
         page_params = json.loads(base64.decodebytes(page.encode()).decode())
         params = {
-            'nextToken': page_params['nextToken'],
-            'startTime': datetime.fromtimestamp(page_params['startTime']),
-            'endTime': datetime.fromtimestamp(page_params['endTime']),
+            "nextToken": page_params["nextToken"],
+            "startTime": datetime.fromtimestamp(page_params["startTime"]),
+            "endTime": datetime.fromtimestamp(page_params["endTime"]),
         }
     else:
         # data is available for 14 days and request period must be within 2 weeks.
         start_date, end_date = date_range
         if start_date > end_date:
-            raise AppError.invalid_argument('start date must be before end date')
+            raise AppError.invalid_argument("start date must be before end date")
 
         now = datetime.now()
         two_weeks_delta = timedelta(days=14)
@@ -88,8 +87,8 @@ def get_connectivity_metric(
         if end_date > now or end_date < start_date:
             end_date = now
 
-        params['startTime'] = start_date
-        params['endTime'] = end_date
+        params["startTime"] = start_date
+        params["endTime"] = end_date
 
     response = iot_client.list_metric_values(
         thingName=device_name,
@@ -105,9 +104,9 @@ def get_connectivity_metric(
     next_page = None
     if "nextToken" in response:
         params = {
-            'nextToken': response['nextToken'],
-            'startTime': params['startTime'].timestamp(),
-            'endTime': params['endTime'].timestamp(),
+            "nextToken": response["nextToken"],
+            "startTime": params["startTime"].timestamp(),
+            "endTime": params["endTime"].timestamp(),
         }
         next_page = base64.encodebytes(json.dumps(params).encode()).decode()
 

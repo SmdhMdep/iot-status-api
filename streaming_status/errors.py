@@ -17,7 +17,7 @@ class AppError(Exception):
         return cls(cls.INVALID_CODE, message)
 
     @classmethod
-    def unauthorized(cls, message = "not authorized"):
+    def unauthorized(cls, message="not authorized"):
         return cls(cls.UNAUTHORIZED_CODE, message)
 
     @classmethod

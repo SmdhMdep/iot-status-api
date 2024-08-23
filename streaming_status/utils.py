@@ -4,7 +4,6 @@ from aws_lambda_powertools.event_handler.api_gateway import BaseProxyEvent
 from .errors import AppError
 from .model import DeviceCustomLabel
 
-
 logger = Logger()
 
 
@@ -22,11 +21,8 @@ def parse_date_range_or_default(range_value):
 
     if range_value is not None:
         try:
-            start, end = range_value.split(',')
-            start_date, end_date = (
-                datetime.fromtimestamp(int(start)),
-                datetime.fromtimestamp(int(end))
-            )
+            start, end = range_value.split(",")
+            start_date, end_date = (datetime.fromtimestamp(int(start)), datetime.fromtimestamp(int(end)))
         except (ValueError, OverflowError):
             raise AppError.invalid_argument("invalid date range format")
     else:
