@@ -8,6 +8,7 @@ from boto3.dynamodb.conditions import Attr, ConditionBase, Key
 from ..config import config
 from ..errors import AppError
 from ..model import DeviceCustomLabel
+from ..utils import logger
 
 dynamodb = boto3.resource("dynamodb", region_name=config.device_ledger_table_region)
 
@@ -266,6 +267,7 @@ def _scan_table(
         if page_size:
             parameters["Limit"] = page_size
 
+        logger.debug("running scan on table %s with params %s", config.device_ledger_table_name, parameters)
         result = dynamodb.Table(config.device_ledger_table_name).scan(**parameters)
         result_size += collector(result)  # type: ignore
 

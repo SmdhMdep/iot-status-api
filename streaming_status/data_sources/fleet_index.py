@@ -48,7 +48,7 @@ def list_devices(
     if page_size is not None:
         request_params["maxResults"] = page_size
 
-    logger.info("search index query: %s", query)
+    logger.debug("search index query: %s", query)
     fleet_result = iot_client.search_index(queryString=query, **request_params)
 
     return fleet_result.get("nextToken"), fleet_result.get("things") or []

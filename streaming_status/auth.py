@@ -105,6 +105,10 @@ class Auth:
     def is_admin(self) -> bool:
         return Role.admin in self._roles()
 
+    def is_provider(self) -> bool:
+        roles = self._roles()
+        return Role.installer in roles or Role.external_installer in roles
+
     def has_permission(self, *permissions: Permission) -> bool:
         current_permissions = self.get_permissions()
         return all(current_permissions[permission] for permission in permissions)

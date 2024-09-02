@@ -53,7 +53,7 @@ def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
 
     if auth.has_permission(Permission.providers_read):
         provider = requested_provider
-    else:
+    elif auth.is_provider():
         groups = auth.group_memberships()
         if not groups:
             raise AppError.invalid_argument("missing groups")
@@ -61,7 +61,11 @@ def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
         provider = requested_provider or groups[0]
         if provider not in groups:
             raise AppError.invalid_argument(f"provider not in groups: {provider}")
+    else:
+        provider = None
 
+    # cached so will be logged once
+    logger.info("request for provider %s", provider)
     return provider
 
 
@@ -82,16 +86,9 @@ def get_request_organization(app: APIGatewayHttpResolver) -> str | None:
         if organization not in groups:
             raise AppError.invalid_argument(f"organization not in groups: {organization}")
 
+    # cached so will be logged once
+    logger.info("request for organization %s", organization)
     return organization
-
-
-def _offline_pass_provider(route):
-    @functools.wraps(route)
-    def wrapper(*args, **kwargs):
-        requested_provider = app.current_event.get_query_string_value("provider")
-        return route(*args, **kwargs, provider=requested_provider)
-
-    return wrapper
 
 
 def pass_provider(route):
@@ -99,13 +96,10 @@ def pass_provider(route):
 
     The decorated route must accept a keyword argument named `provider`.
     """
-    # if config.is_offline:
-    #     return _offline_pass_provider(route)
 
     @functools.wraps(route)
     def wrapper(*args, **kwargs):
         provider = get_request_provider(app)
-        logger.info("request for provider %s", provider)
         logger.append_keys(provider=provider)
         return route(*args, **kwargs, provider=provider)
 
@@ -327,6 +321,11 @@ def me():
         "permissions": auth.get_permissions(),
         "name": auth.name(),
         "group": repo._canonicalize_group_name(group),
+        **(
+            {"provider": get_request_provider(app), "organization": get_request_organization(app)}
+            if config.is_offline
+            else {}
+        ),
     }
 
 
