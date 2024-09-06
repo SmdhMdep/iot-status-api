@@ -99,7 +99,7 @@ def _build_scan_params(
     return params
 
 
-def find_device(provider: str | None, organization: str | None, device_name: str):
+def find_device(provider: str | None, organization: str | None, device_name: str) -> dict | None:
     key = {"serialNumber": device_name}
     device_info = dynamodb.Table(config.device_ledger_table_name).get_item(Key=key).get("Item", {})
     device_provider: str = device_info.get("jwtGroup")  # type: ignore
@@ -167,7 +167,7 @@ def list_providers(
         condition = Attr("org").eq(organization)
     if name_like:
         name_like_condition = Attr("jwtGroup").begins_with(name_like)
-        condition = condition and name_like_condition if condition else name_like_condition
+        condition = condition & name_like_condition if condition else name_like_condition
 
     params: dict = {"IndexName": config.device_ledger_groups_index_name}
     if condition:
@@ -201,7 +201,7 @@ def _list_organizations_for_provider(
     condition: ConditionBase = Key("jwtGroup").eq(provider)
     if name_like:
         name_like_condition = Key("org").begins_with(name_like)
-        condition = condition and name_like_condition if condition else name_like_condition
+        condition = condition & name_like_condition
 
     params: dict = {}
     if page:

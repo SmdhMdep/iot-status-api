@@ -22,7 +22,7 @@ def list_devices(
     page: str | None = None,
     page_size: int | None = None,
     active_only: bool = True,
-):
+) -> tuple[str | None, list[dict]]:
     query = f"attributes.{ThingAttributeNames.REGISTRATION_WAY}:*"
 
     provider_quoted = provider.replace('"', '\\"') if provider else None
@@ -51,10 +51,11 @@ def list_devices(
     logger.debug("search index query: %s", query)
     fleet_result = iot_client.search_index(queryString=query, **request_params)
 
-    return fleet_result.get("nextToken"), fleet_result.get("things") or []
+    things: list[dict] = fleet_result.get("things") # type: ignore
+    return fleet_result.get("nextToken"), things or []
 
 
-def find_device(provider: str | None, organization: str | None, device_name: str):
+def find_device(provider: str | None, organization: str | None, device_name: str) -> dict | None:
     if not device_name_regex.fullmatch(device_name):
         raise AppError.invalid_argument(f"name must match the regex: {device_name_regex.pattern}")
     if (provider is not None and '"' in provider) or (organization is not None and '"' in organization):
@@ -70,7 +71,7 @@ def find_device(provider: str | None, organization: str | None, device_name: str
     if not result["things"]:
         return None
 
-    return result["things"][0]
+    return result["things"][0] # type: ignore
 
 
 def update_device_active_state(device_name: str, active: bool):
