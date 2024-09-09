@@ -9,7 +9,7 @@ from . import repo
 from .auth import Auth, Permission
 from .config import config
 from .errors import AppError
-from .utils import get_query_integer_value, logger, parse_date_range_or_default, parse_device_custom_label
+from .utils import logger, parse_date_range_or_default, parse_device_custom_label
 
 cors = CORSConfig(allow_origin=config.cors_allowed_origin, max_age=300, allow_credentials=True)
 app = APIGatewayHttpResolver(strip_prefixes=["/api"], cors=cors, debug=config.is_offline)
@@ -270,7 +270,7 @@ def list_providers():
     return repo.list_providers(
         organization=get_request_organization(app),
         name_like=app.current_event.get_query_string_value("query"),
-        page=get_query_integer_value(app.current_event, "page"),
+        page=app.current_event.get_query_string_value(app.current_event, "page"),
         all=auth.is_admin(),
     )
 
@@ -285,8 +285,24 @@ def list_organizations(provider):
     return repo.list_organizations(
         provider=provider,
         name_like=app.current_event.get_query_string_value("query"),
-        page=get_query_integer_value(app.current_event, "page"),
+        page=app.current_event.get_query_string_value("page"),
         all=all_orgs,
+    )
+
+
+@app.get("/projects")
+@require_permission(Permission.organizations_read)
+@pass_provider
+def list_projects(provider):
+    organization = app.current_event.get_query_string_value("organization")
+    if organization.strip() == "":
+        organization = None
+
+    return repo.list_projects(
+        provider=provider,
+        organization=organization,
+        name_like=app.current_event.get_query_string_value("query"),
+        page=app.current_event.get_query_string_value("page"),
     )
 
 

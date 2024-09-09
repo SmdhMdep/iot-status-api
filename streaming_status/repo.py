@@ -133,7 +133,7 @@ def update_device_label(device_name: str, label: DeviceCustomLabel | None):
     if item is None:
         raise AppError.not_found("no such device")
 
-    old_label_value = item.get("customLabel")  # type: str
+    old_label_value = item.get("customLabel")  # type: str | None
     old_label = DeviceCustomLabel.from_value(old_label_value) if old_label_value else None
 
     device_ledger.update_device_label(device_name=device_name, expected_label=old_label, label=label)
@@ -186,12 +186,13 @@ def list_organizations(
     page_size: int = DEFAULT_PAGE_SIZE,
     all: bool = True,
 ) -> PaginatedResult[str, str]:
-    logger.info(config.device_ledger_groups_index_name)
     if config.device_ledger_groups_index_name is not None and not all:
         provider = _maybe_canonicalize_group_name(provider)
         next_page, groups = device_ledger.list_organizations(
             provider=provider,
             name_like=name_like,
+            page=page,
+            page_size=page_size,
         )
 
         return {"items": groups, "nextPage": next_page}
@@ -204,6 +205,25 @@ def list_organizations(
             "items": [_canonicalize_group_name(g) for g in groups],
             "nextPage": str(next_page) if next_page else None,
         }
+
+
+def list_projects(
+    provider: str | None = None,
+    organization: str | None = None,
+    name_like: str | None = None,
+    page: str | None = None,
+    page_size: int = DEFAULT_PAGE_SIZE,
+) -> PaginatedResult[str, str]:
+    provider = _maybe_canonicalize_group_name(provider)
+    next_page, groups = device_ledger.list_projects(
+        provider=provider,
+        organization=organization,
+        name_like=name_like,
+        page=page,
+        page_size=page_size,
+    )
+
+    return {"items": groups, "nextPage": next_page}
 
 
 def _parse_int(value: str | None, name: str) -> int:

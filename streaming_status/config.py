@@ -43,6 +43,10 @@ class _Config:
         return os.environ.get("DEVICE_LEDGER_GROUPS_INDEX_NAME")
 
     @property
+    def device_ledger_org_proj_index_name(self) -> str:
+        return os.environ["DEVICE_LEDGER_ORG_PROJ_INDEX_NAME"]
+
+    @property
     def device_ledger_table_region(self) -> str:
         return os.environ["DEVICE_LEDGER_TABLE_REGION"]
 

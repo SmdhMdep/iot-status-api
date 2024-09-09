@@ -164,10 +164,9 @@ def list_providers(
 
     condition: ConditionBase | None = None
     if organization:
-        condition = Attr("org").eq(organization)
+        condition = _combine_condition(condition, Attr("org").eq(organization))
     if name_like:
-        name_like_condition = Attr("jwtGroup").begins_with(name_like)
-        condition = condition & name_like_condition if condition else name_like_condition
+        condition = _combine_condition(condition, Attr("jwtGroup").begins_with(name_like))
 
     params: dict = {"IndexName": config.device_ledger_groups_index_name}
     if condition:
@@ -200,8 +199,7 @@ def _list_organizations_for_provider(
 
     condition: ConditionBase = Key("jwtGroup").eq(provider)
     if name_like:
-        name_like_condition = Key("org").begins_with(name_like)
-        condition = condition & name_like_condition
+        condition = _combine_condition(condition, Key("org").begins_with(name_like))
 
     params: dict = {}
     if page:
@@ -233,7 +231,7 @@ def list_organizations(
     if provider is not None:
         return _list_organizations_for_provider(provider, name_like)
 
-    condition = Attr("jwtGroup").begins_with(name_like) if name_like else None
+    condition = Attr("org").begins_with(name_like) if name_like else None
 
     params: dict = {"IndexName": config.device_ledger_groups_index_name}
     if condition:
@@ -245,6 +243,51 @@ def list_organizations(
 
     def collect_items(result):
         items.update(item["org"] for item in result.get("Items", []))
+        return len(items)
+
+    decoded_page = _decode_page(page)
+    next_page = _scan_table(params, page=decoded_page, page_size=page_size, collector=collect_items)
+
+    return _encode_page(next_page), list(items)
+
+
+def list_projects(
+    provider: str | None,
+    organization: str | None,
+    name_like: str | None,
+    page: str | None = None,
+    page_size: int | None = None,
+):
+    condition: ConditionBase | None = None
+    if provider is not None:
+        condition = _combine_condition(condition, Attr("jwtGroup").eq(provider))
+    if organization is not None:
+        condition = _combine_condition(condition, Attr("org").eq(organization))
+    if name_like is not None:
+        condition = _combine_condition(condition, Attr("proj").begins_with(name_like))
+
+    params: dict = {"IndexName": config.device_ledger_org_proj_index_name}
+    if condition:
+        params["FilterExpression"] = condition
+    if page_size:
+        params["Limit"] = page_size
+
+    items: list[dict] = list()
+    seen_org_project = set()
+
+    def collect_items(result):
+        for item in result.get("Items", []):
+            if (item["org"], item["proj"]) in seen_org_project:
+                continue
+
+            seen_org_project.add((item["org"], item["proj"]))
+            items.append(
+                {
+                    "organization": item.get("org", "UNKNOWN"),
+                    "project": item.get("proj", "-"),
+                }
+            )
+
         return len(items)
 
     decoded_page = _decode_page(page)
@@ -278,3 +321,7 @@ def _scan_table(
             break
 
     return next_page
+
+
+def _combine_condition(condition: ConditionBase | None, predicate: ConditionBase):
+    return condition & predicate if condition is not None else predicate

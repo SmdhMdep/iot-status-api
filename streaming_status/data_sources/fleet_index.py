@@ -51,7 +51,7 @@ def list_devices(
     logger.debug("search index query: %s", query)
     fleet_result = iot_client.search_index(queryString=query, **request_params)
 
-    things: list[dict] = fleet_result.get("things") # type: ignore
+    things: list[dict] = fleet_result.get("things")  # type: ignore
     return fleet_result.get("nextToken"), things or []
 
 
@@ -71,7 +71,7 @@ def find_device(provider: str | None, organization: str | None, device_name: str
     if not result["things"]:
         return None
 
-    return result["things"][0] # type: ignore
+    return result["things"][0]  # type: ignore
 
 
 def update_device_active_state(device_name: str, active: bool):

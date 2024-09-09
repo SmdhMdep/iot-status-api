@@ -7,8 +7,9 @@ This API exposes the following endpoints:
 - /api/devices - list all devices for the provider
 - /api/devices/export - export a list of all devices into csv or json
 - /api/devices/<device_id> - get device details
-- /api/providers - for admins, list all device providers
-- /api/organizations - list all organizations
+- /api/providers - list device providers
+- /api/organizations - list organizations
+- /api/projects - list projects
 - /api/schemas - list all devices data schemas
 - /api/schemas/<schema_id> - get schema by id
 
