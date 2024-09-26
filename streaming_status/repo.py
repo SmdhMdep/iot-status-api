@@ -142,15 +142,24 @@ def update_device_label(device_name: str, label: DeviceCustomLabel | None):
 
     try:
         fleet_index.update_device_active_state(device_name=device_name, active=label != DeviceCustomLabel.deactivated)
-    except Exception:
-        logger.exception("failed to update thing %s label from %s to %s", device_name, old_label, label)
+    except Exception as e:
         try:
             # try compensating device ledger update
             device_ledger.update_device_label(device_name=device_name, expected_label=label, label=old_label)
         except Exception:
-            logger.exception("unable to revert device %s label from %s to %s", device_name, label, old_label)
+            logger.exception(
+                "partial device label update error: unable to revert device %s label from %s to %s",
+                device_name,
+                label,
+                old_label,
+            )
             raise
-        raise
+
+        if isinstance(e, fleet_index.DeviceNotFoundError):
+            raise AppError.invalid_argument("cannot deactivate unprovisioned device")
+        else:
+            logger.exception("failed to update thing %s label from %s to %s", device_name, old_label, label)
+            raise
 
 
 def list_providers(

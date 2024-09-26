@@ -1,6 +1,8 @@
 import re
 
 import boto3
+import botocore
+import botocore.exceptions
 
 from ..config import config
 from ..errors import AppError
@@ -74,14 +76,24 @@ def find_device(provider: str | None, organization: str | None, device_name: str
     return result["things"][0]  # type: ignore
 
 
+class DeviceNotFoundError(Exception):
+    pass
+
+
 def update_device_active_state(device_name: str, active: bool):
-    if not active:
-        iot_client.add_thing_to_thing_group(
-            thingGroupName=DEACTIVATED_THINGS_GROUP_NAME,
-            thingName=device_name,
-        )
-    else:
-        iot_client.remove_thing_from_thing_group(
-            thingGroupName=DEACTIVATED_THINGS_GROUP_NAME,
-            thingName=device_name,
-        )
+    try:
+        if not active:
+            iot_client.add_thing_to_thing_group(
+                thingGroupName=DEACTIVATED_THINGS_GROUP_NAME,
+                thingName=device_name,
+            )
+        else:
+            iot_client.remove_thing_from_thing_group(
+                thingGroupName=DEACTIVATED_THINGS_GROUP_NAME,
+                thingName=device_name,
+            )
+    except botocore.exceptions.ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "Unknown")
+        if code == "ResourceNotFoundException":
+            raise DeviceNotFoundError("no such device") from e
+        raise
