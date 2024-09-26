@@ -270,7 +270,7 @@ def list_providers():
     return repo.list_providers(
         organization=get_request_organization(app),
         name_like=app.current_event.get_query_string_value("query"),
-        page=app.current_event.get_query_string_value(app.current_event, "page"),
+        page=app.current_event.get_query_string_value("page"),
         all=auth.is_admin(),
     )
 
