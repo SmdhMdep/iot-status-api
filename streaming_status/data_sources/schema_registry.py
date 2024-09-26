@@ -18,7 +18,7 @@ def list_schemas(
 ) -> tuple[str | None, Iterable[dict]]:
     try:
         decoded_page = json.loads(base64.decodebytes(page.encode()).decode()) if page else None
-    except:
+    except Exception:
         raise AppError.invalid_argument("invalid page key")
 
     params: dict = {}

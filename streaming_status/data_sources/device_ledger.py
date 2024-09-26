@@ -16,7 +16,7 @@ dynamodb = boto3.resource("dynamodb", region_name=config.device_ledger_table_reg
 def _decode_page(page: str | None) -> dict | None:
     try:
         return json.loads(base64.decodebytes(page.encode()).decode()) if page else None
-    except:
+    except Exception:
         raise AppError.invalid_argument("invalid page key")
 
 
@@ -312,7 +312,7 @@ def _scan_table(
 
         logger.debug("running scan on table %s with params %s", config.device_ledger_table_name, parameters)
         result = dynamodb.Table(config.device_ledger_table_name).scan(**parameters)
-        result_size += collector(result)  # type: ignore
+        result_size = collector(result)  # type: ignore
 
         next_page = result.get("LastEvaluatedKey")
         if (page_size is None or result_size < page_size) and next_page is not None:
