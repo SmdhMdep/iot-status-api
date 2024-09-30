@@ -2,6 +2,7 @@ import functools
 import json
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig, Response, content_types
+from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.logging.correlation_paths import API_GATEWAY_HTTP
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
@@ -12,7 +13,24 @@ from .errors import AppError
 from .utils import logger, parse_date_range_or_default, parse_device_custom_label
 
 cors = CORSConfig(allow_origin=config.cors_allowed_origin, max_age=300, allow_credentials=True)
-app = APIGatewayHttpResolver(strip_prefixes=["/api"], cors=cors, debug=config.is_offline)
+app = APIGatewayHttpResolver(strip_prefixes=["/api"], cors=cors, debug=False)
+
+
+def dump_info_middleware(app: APIGatewayHttpResolver, next_middleware: NextMiddleware) -> Response:
+    logger.append_keys(
+        path=app.current_event.path,
+        user_id=get_auth(app).user_id(),
+    )
+    logger.info(
+        "Request info dump",
+        extra=dict(
+            request_time=app.current_event.request_context.time,
+            query_params=app.current_event.query_string_parameters,
+            provider=get_request_provider(app),
+            organization=get_request_organization(app),
+        ),
+    )
+    return next_middleware(app)
 
 
 @app.exception_handler(AppError)
@@ -64,8 +82,6 @@ def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
     else:
         provider = None
 
-    # cached so will be logged once
-    logger.info("request for provider %s", provider)
     return provider
 
 
@@ -86,8 +102,6 @@ def get_request_organization(app: APIGatewayHttpResolver) -> str | None:
         if organization not in groups:
             raise AppError.invalid_argument(f"organization not in groups: {organization}")
 
-    # cached so will be logged once
-    logger.info("request for organization %s", organization)
     return organization
 
 
@@ -100,7 +114,6 @@ def pass_provider(route):
     @functools.wraps(route)
     def wrapper(*args, **kwargs):
         provider = get_request_provider(app)
-        logger.append_keys(provider=provider)
         return route(*args, **kwargs, provider=provider)
 
     return wrapper
@@ -349,6 +362,9 @@ def me():
 def me_permissions():
     auth = get_auth(app)
     return auth.get_permissions()
+
+
+app.use(middlewares=[dump_info_middleware])
 
 
 @logger.inject_lambda_context(correlation_id_path=API_GATEWAY_HTTP)

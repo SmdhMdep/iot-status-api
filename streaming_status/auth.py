@@ -82,6 +82,9 @@ class Auth:
     def email(self) -> str:
         return self._introspect_token()["email"]
 
+    def user_id(self) -> str | None:
+        return self._introspect_token().get("sub")
+
     def name(self) -> str:
         token = self._introspect_token()
         return token.get("name") or token["email"]
