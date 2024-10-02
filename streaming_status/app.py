@@ -13,13 +13,13 @@ from .errors import AppError
 from .utils import logger, parse_date_range_or_default, parse_device_custom_label
 
 cors = CORSConfig(allow_origin=config.cors_allowed_origin, max_age=300, allow_credentials=True)
-app = APIGatewayHttpResolver(strip_prefixes=["/api"], cors=cors, debug=False)
+app = APIGatewayHttpResolver(strip_prefixes=["/api"], cors=cors, debug=config.is_offline)
 
 
 def dump_info_middleware(app: APIGatewayHttpResolver, next_middleware: NextMiddleware) -> Response:
     logger.append_keys(
         path=app.current_event.path,
-        user_id=get_auth(app).user_id(),
+        user_id=get_auth(app).user_id() if not config.is_offline else "offline-user",
     )
     logger.info(
         "Request info dump",
@@ -68,6 +68,8 @@ def get_request_provider(app: APIGatewayHttpResolver) -> str | None:
     """Returns the provider associated with the current user for the request."""
     auth = get_auth(app)
     requested_provider = app.current_event.get_query_string_value("provider")
+    if config.is_offline:
+        return requested_provider
 
     if auth.has_permission(Permission.providers_read):
         provider = requested_provider
@@ -90,6 +92,8 @@ def get_request_organization(app: APIGatewayHttpResolver) -> str | None:
     """Returns the organization associated with the current user for the request."""
     auth = get_auth(app)
     requested_organization = app.current_event.get_query_string_value("organization")
+    if config.is_offline:
+        return requested_organization
 
     if auth.has_permission(Permission.organizations_read):
         organization = requested_organization
