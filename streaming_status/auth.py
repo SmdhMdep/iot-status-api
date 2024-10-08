@@ -23,6 +23,7 @@ class Permission(StrEnum):
     devices_update = "devices:update"
     device_label_update = "device_label:update"
     optional_schema = "optional_schema"
+    schema_notifications_subscribe = "schema_notifications:subscribe"
 
     @staticmethod
     def merge_inplace(into: dict["Permission", bool], from_: dict["Permission", bool]):
@@ -38,6 +39,7 @@ _role_permissions = {
         Permission.devices_create: True,
         Permission.devices_update: True,
         Permission.device_label_update: True,
+        Permission.schema_notifications_subscribe: True,
     },
     Role.installer.value: {
         Permission.providers_read: False,
@@ -45,6 +47,7 @@ _role_permissions = {
         Permission.devices_create: True,
         Permission.devices_update: True,
         Permission.device_label_update: True,
+        Permission.schema_notifications_subscribe: True,
     },
     Role.external_installer.value: {
         Permission.providers_read: False,
@@ -52,18 +55,21 @@ _role_permissions = {
         Permission.devices_create: True,
         Permission.devices_update: True,
         Permission.device_label_update: True,
+        Permission.schema_notifications_subscribe: True,
     },
     Role.data_scientist.value: {
         Permission.providers_read: True,
         Permission.organizations_read: True,
         Permission.devices_create: False,
         Permission.device_label_update: False,
+        Permission.schema_notifications_subscribe: False,
     },
     Role.organization_member.value: {
         Permission.providers_read: False,
         Permission.organizations_read: False,
         Permission.devices_create: False,
         Permission.device_label_update: False,
+        Permission.schema_notifications_subscribe: False,
     },
     Role.optional_schema.value: {
         Permission.optional_schema: True,

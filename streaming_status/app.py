@@ -1,3 +1,4 @@
+import time
 import functools
 import json
 
@@ -321,6 +322,37 @@ def list_projects(provider):
         name_like=app.current_event.get_query_string_value("query"),
         page=app.current_event.get_query_string_value("page"),
     )
+
+@app.get("/schema_notifications/oranizations")
+@require_permission(Permission.schema_notifications_subscribe)
+@pass_provider
+def list_providing_organizations(provider):
+    organizations = repo.list_organizations_for_provider(
+        provider=provider,
+        page=app.current_event.get_query_string_value("page"),
+    )
+
+    return organizations
+
+@app.post("/schema_notifications/subscribe")
+@require_permission(Permission.schema_notifications_subscribe)
+@pass_provider
+def subscribe_to_schema_notifications(provider):
+    auth: Auth = get_auth(app)
+    logger.info(auth.email())
+    return "Success"
+
+@app.post("/schema_notifications/unsubscribe")
+@require_permission(Permission.schema_notifications_subscribe)
+@pass_provider
+def unsubscribe_to_schema_notifications(provider):
+    if(app.current_event.body is None):
+        raise RuntimeError("Empty request body")
+
+    request_body = json.loads(app.current_event.body)
+    logger.info(request_body['organizationName'])
+    logger.info(get_auth(app).email())
+    return "Success"
 
 
 @app.get("/schemas")

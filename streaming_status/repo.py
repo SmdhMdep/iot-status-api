@@ -215,6 +215,21 @@ def list_organizations(
             "nextPage": str(next_page) if next_page else None,
         }
 
+def list_organizations_for_provider(
+    provider: str | None = None,
+    page: str | None = None,
+    page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> PaginatedResult[str, str]:
+    provider = _maybe_canonicalize_group_name(provider)
+    next_page, groups = device_ledger.list_organizations(
+        provider=provider,
+        name_like=None,
+        page=page,
+        page_size=page_size,
+    )
+
+    return {"items": groups, "nextPage": next_page}
+
 
 def list_projects(
     provider: str | None = None,
