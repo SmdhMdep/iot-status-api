@@ -7,7 +7,7 @@ from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.logging.correlation_paths import API_GATEWAY_HTTP
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
-from streaming_status.schema_notifications.schema_notifications import get_subscription_status, subscribe_to_notifications, unsubscribe_from_notifications
+from streaming_status.schema_notifications.schema_notifications import get_subscription_status, subscribe_to_notifications
 
 from . import repo
 from .auth import Auth, Permission
@@ -348,9 +348,8 @@ def subscribe_to_schema_notifications(provider):
 @pass_provider
 def unsubscribe_to_schema_notifications(provider):
     auth: Auth = get_auth(app)
-    group = auth.group_memberships()[0]
-    arn = unsubscribe_from_notifications(auth.email(), group)
-    return arn
+    logger.info("here")
+    return unsubscribe_to_schema_notifications(auth.email())
 
 
 @app.get("/schemas")

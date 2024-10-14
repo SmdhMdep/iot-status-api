@@ -1,14 +1,54 @@
+from logging import getLogger
 import boto3
+
+from streaming_status.repo import _maybe_canonicalize_group_name
 
 from ..config import config
 from ..utils import AppError, logger
 
 sns_client = boto3.client("sns", region_name=config.schema_registry_table_region)
 dynamodb = boto3.resource("dynamodb", region_name=config.schema_registry_table_region)
-device_alarms_subscriptions_table = dynamodb.Table(config.schema_notifications_table)
+schema_notifications_subscription_table = dynamodb.Table(config.schema_notifications_table)
 
-def subscribe_to_notifications(organization_name, subscriber_email)-> None:
-    pass
+def get_subscription_status(email: str) -> str:
+    subscription_record = _get_user_subscription_record_if_exists(email)
+    if(subscription_record is None):
+        return "NOT_SUBSCRIBED"
+
+    subscription_arn = subscription_record.get("subscription_arn")
+    confirmation_status = _has_user_confirmed_email_confirmation(subscription_arn)
+    
+    if(confirmation_status is True):
+        return "SUBSCRIBED"
+    else:
+        return "PENDING_CONFIRMATION"
+
+def _get_user_subscription_record_if_exists(email: str):
+    response = schema_notifications_subscription_table.get_item(Key={"user": email})
+    return response.get("Item")
+
+def _has_user_confirmed_email_confirmation(subscription_arn) -> bool:
+    try:
+        response = sns_client.get_subscription_attributes(SubscriptionArn=subscription_arn)
+        confirmation_pending_status = response["Attributes"]["PendingConfirmation"]
+        if (confirmation_pending_status == "true"):
+            return False
+        else:
+            return True
+    except sns_client.exceptions.NotFoundException:
+        raise RuntimeError("Subscription not found in SNS")
+
+def subscribe_to_notifications(email, group_name) -> None:
+    provider = _maybe_canonicalize_group_name(group_name)
+    topic = _generate_topic_name(provider)
+    topic_arn = _create_topic_if_not_exists(topic)
+    subscription_arn = _subscribe_to_topic(topic_arn, email) 
+    _put_subscription_record(subscription_arn, email, provider)
+    logger.info(f"{email} from group {group_name} has subscribed to schema notifications.")
+
+def _generate_topic_name(provider_name) -> str:
+    topic_name = f"{config.schema_notifications_sns_prefix}_{provider_name}"
+    return topic_name
 
 def _create_topic_if_not_exists(topic_name):
     try:
@@ -28,6 +68,21 @@ def _subscribe_to_topic(topic_arn, email):
     )
     return response["SubscriptionArn"]
 
+def unsubscribe_from_notifications(email, group):
+    subscription_arn = _get_subscription_arn(email)
+    _unsubscribe_to_topic(subscription_arn)
+    _remove_subscription_record(email)
+    # TODO: Replace with userid
+    logger.info(f"{email} from {group} is unsubscribing from schema notifications")
+
+def _get_subscription_arn(email):
+    response = schema_notifications_subscription_table.get_item(
+        Key={
+        'user':email
+        }
+    )
+    item = response.get('Item')
+    return item.get('subscription_arn')
 
 def _unsubscribe_to_topic(subscription_arn):
     try:
@@ -35,32 +90,14 @@ def _unsubscribe_to_topic(subscription_arn):
     except sns_client.exceptions.InvalidParameterException as e:
         raise AppError.invalid_argument("pending subscriptions cannot be cancelled")
 
+def _remove_subscription_record(email):
+    schema_notifications_subscription_table.delete_item(Key={'user':email})
 
-def _get_subscription_status(subscription_arn):
-    try:
-        response = sns_client.get_subscription_attributes(SubscriptionArn=subscription_arn)
-        return response["Attributes"]
-    except sns_client.exceptions.NotFoundException:
-        return None
-
-
-def _put_subscription_record(subscription_arn, device_name, email):
-    device_alarms_subscriptions_table.put_item(
+def _put_subscription_record(subscription_arn, email, provider_name):
+    schema_notifications_subscription_table.put_item(
         Item={
-            "device_name": device_name,
-            "subscription_endpoint": email,
+            "user": email,
+            "subscribed_installer": provider_name,
             "subscription_arn": subscription_arn,
         }
     )
-
-
-def _get_subscription_record(device_name, email):
-    response = device_alarms_subscriptions_table.get_item(
-        Key={
-            "device_name": device_name,
-            "subscription_endpoint": email,
-        }
-    )
-
-    return response.get("Item")
-    pass
