@@ -11,32 +11,27 @@ dynamodb = boto3.resource("dynamodb", region_name=config.schema_registry_table_r
 schema_notifications_subscription_table = dynamodb.Table(config.schema_notifications_table)
 
 def get_subscription_status(email: str) -> str:
-    subscription_record = _get_user_subscription_record_if_exists(email)
-    if(subscription_record is None):
-        return "NOT_SUBSCRIBED"
+    record = _get_user_subscription_record_if_exists(email) or {}
+    sub_arn = record.get("subscription_arn")
+    subscription = _get_subscription_status(sub_arn) if sub_arn is not None else None
 
-    subscription_arn = subscription_record.get("subscription_arn")
-    confirmation_status = _has_user_confirmed_email_confirmation(subscription_arn)
-    
-    if(confirmation_status is True):
-        return "SUBSCRIBED"
-    else:
+    if subscription is None:
+        return "NOT_SUBSCRIBED"
+    elif subscription["PendingConfirmation"] == "true":
         return "PENDING_CONFIRMATION"
+    else:
+        return "SUBSCRIBED"
 
 def _get_user_subscription_record_if_exists(email: str):
     response = schema_notifications_subscription_table.get_item(Key={"user": email})
     return response.get("Item")
 
-def _has_user_confirmed_email_confirmation(subscription_arn) -> bool:
+def _get_subscription_status(subscription_arn):
     try:
         response = sns_client.get_subscription_attributes(SubscriptionArn=subscription_arn)
-        confirmation_pending_status = response["Attributes"]["PendingConfirmation"]
-        if (confirmation_pending_status == "true"):
-            return False
-        else:
-            return True
+        return response["Attributes"]
     except sns_client.exceptions.NotFoundException:
-        raise RuntimeError("Subscription not found in SNS")
+        return None
 
 def subscribe_to_notifications(email, group_name) -> None:
     provider = _maybe_canonicalize_group_name(group_name)
