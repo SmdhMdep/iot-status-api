@@ -73,8 +73,8 @@ provider:
           Resource:
             - ${self:custom.dotenv.DEVICES_ALARMS_SRC_SNS_TOPIC_ARN}
             - ${self:custom.dotenv.DEVICE_ALARMS_DEST_SNS_TOPIC_ARN_PREFIX}*
-            - !Sub arn:aws:sns:${self:custom.dotenv.SCHEMA_NOTIFICATIONS_TABLE_REGION}:${AWS::AccountId}:${self:custom.dotenv.SCHEMA_NOTIFICATIONS_SNS_TOPIC_PREFIX}*
-            - !Sub arn:aws:dynamodb:${self:custom.dotenv.SCHEMA_NOTIFICATIONS_TABLE_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.SCHEMA_NOTIFICATIONS_TABLE}
+            - !Sub arn:aws:sns:${self:custom.dotenv.SCHEMA_NOTIFICATIONS_REGION}:${AWS::AccountId}:${self:custom.dotenv.SCHEMA_NOTIFICATIONS_SNS_TOPIC_PREFIX}*
+            - !Sub arn:aws:dynamodb:${self:custom.dotenv.SCHEMA_NOTIFICATIONS_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.SCHEMA_NOTIFICATIONS_TABLE}
             - !Sub arn:aws:dynamodb:${self:custom.dotenv.DEVICE_ALARMS_TABLE_REGION}:${AWS::AccountId}:table/${self:custom.dotenv.DEVICE_ALARMS_TABLE_NAME}
         # Specific actions
         - Effect: Allow

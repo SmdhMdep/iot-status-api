@@ -86,7 +86,7 @@ class _Config:
     @property
     def device_alarms_table_region(self) -> str:
         return os.environ["DEVICE_ALARMS_TABLE_REGION"]
-    
+
     @property
     def schema_notifications_table(self) -> str:
         return os.environ["SCHEMA_NOTIFICATIONS_TABLE"]
@@ -94,5 +94,10 @@ class _Config:
     @property
     def schema_notifications_sns_prefix(self) -> str:
         return os.environ["SCHEMA_NOTIFICATIONS_SNS_TOPIC_PREFIX"]
+
+    @property
+    def schema_notifications_region(self) -> str:
+        return os.environ["SCHEMA_NOTIFICATIONS_REGION"]
+
 
 config = _Config()

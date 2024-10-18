@@ -1,4 +1,3 @@
-import time
 import functools
 import json
 
@@ -6,8 +5,6 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConf
 from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.logging.correlation_paths import API_GATEWAY_HTTP
 from aws_lambda_powertools.utilities.typing import LambdaContext
-
-from streaming_status.schema_notifications.schema_notifications import get_subscription_status, subscribe_to_notifications, unsubscribe_from_notifications
 
 from . import repo
 from .auth import Auth, Permission
@@ -325,31 +322,40 @@ def list_projects(provider):
         page=app.current_event.get_query_string_value("page"),
     )
 
+
 @app.get("/schema_notifications/status")
 @require_permission(Permission.schema_notifications_subscribe)
 @pass_provider
 def get_schema_notifications_subscription_status(provider):
-    auth: Auth = get_auth(app)
-    return get_subscription_status(auth.email())
+    from .data_sources import schema_notifications
+
+    auth = get_auth(app)
+    return schema_notifications.get_subscription_status(auth.email())
+
 
 @app.post("/schema_notifications/subscribe")
 @require_permission(Permission.schema_notifications_subscribe)
 @pass_provider
 def subscribe_to_schema_notifications(provider):
-    auth: Auth = get_auth(app)
+    from .data_sources import schema_notifications
+
+    auth = get_auth(app)
     # Some special users can be in more than one group, in such cases,
     # we are just using the first group in their list
     group = auth.group_memberships()[0]
-    subscribe_to_notifications(auth.email(), group)
+    schema_notifications.subscribe_to_notifications(auth.email(), group)
     return "Success"
+
 
 @app.post("/schema_notifications/unsubscribe")
 @require_permission(Permission.schema_notifications_subscribe)
 @pass_provider
 def unsubscribe_to_schema_notifications(provider):
-    auth: Auth = get_auth(app)
+    from .data_sources import schema_notifications
+
+    auth = get_auth(app)
     group = auth.group_memberships()[0]
-    arn = unsubscribe_from_notifications(auth.email(), group)
+    arn = schema_notifications.unsubscribe_from_notifications(auth.email(), group)
     return arn
 
 
